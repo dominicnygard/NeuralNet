@@ -230,64 +230,170 @@ void train_model(NeuralNetwork& model, const std::vector<std::pair<MatrixXd, Mat
     }
 }
 
-void readfile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Could not open file: " << filename << std::endl;
-        return;
-    }
-
-    std::vector<unsigned char> bytes(3073);
-    file.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
-
-    MatrixXd image(3, 1024);
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 1024; j++) {
-            image(i, j) = static_cast<double>(bytes[i*1024 + j + 1]) / 255.0;
+class Cifar10data {
+    private:
+        std::vector<std::string> filenames;
+        std::vector<std::pair<MatrixXd, MatrixXd>> dataset;
+    public:
+        Cifar10data(std::vector<std::string> &filenames) {
+            this->filenames = filenames;
+            read_dataset();
         }
-    }
 
-    MatrixXd label = MatrixXd::Zero(1, 10);
-    label(0, bytes[0]) = 1.0;
+        void read_dataset() {
+            for (const auto& filename : filenames) {
+                std::ifstream file(filename, std::ios::binary);
+                if (!file.is_open()) {
+                    std::cerr << "Could not open file: " << filename << std::endl;
+                    return;
+                }
 
-    std::cout << "Label: " << bytes[0] << std::endl;
-    std::cout << "Image: " << image << std::endl;
-    std::cout << "Label: " << label << std::endl;
-    
+                for (int i = 0; i < 10000; i++) {
+                    std::vector<unsigned char> bytes(3073);
+                    file.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
 
-    file.close();
-}
+                    MatrixXd image(1, 3072);
+                    for (int j = 0; j < 3072; j++) {
+                        image(0, j) = static_cast<double>(bytes[j + 1]) / 255.0;
+                    }
+
+                    MatrixXd label = MatrixXd::Zero(1, 10);
+                    label(0, bytes[0]) = 1.0;
+
+                    dataset.push_back({image, label});
+                }
+                
+
+                file.close();
+            }
+        }
+
+        std::vector<std::pair<MatrixXd, MatrixXd>> get_dataset() {
+            return dataset;
+        }
+};
+
+class MnistData {
+    private:
+        std::string images;
+        std::string labels;
+        std::vector<std::pair<MatrixXd, MatrixXd>> dataset;
+    public:
+        MnistData(std::string &images, std::string &labels) {
+            this->images = images;
+            this->labels = labels;
+            read_dataset();
+        }
+
+        int read_int(std::ifstream& file) {
+            unsigned char buffer[4];
+            file.read(reinterpret_cast<char*>(buffer), 4);
+            return (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
+        }
+
+        void read_dataset() {
+            std::ifstream image_file(images, std::ios::binary);
+            std::ifstream label_file(labels, std::ios::binary);
+            if (!image_file.is_open() || !label_file.is_open()) {
+                std::cerr << "Could not open file: " << images << std::endl;
+                return;
+            }
+
+            int magic_number = read_int(image_file);
+            if (magic_number != 2051) {
+                std::cerr << "Invalid magic number for images file" << std::endl;
+                return;
+            }
+            magic_number = read_int(label_file);
+            if (magic_number != 2049) {
+                std::cerr << "Invalid magic number for labels file" << std::endl;
+                return;
+            }
+
+            int num_images = read_int(image_file);
+            int num_labels = read_int(label_file);
+            if (num_images != num_labels) {
+                std::cerr << "Number of images and labels do not match" << std::endl;
+                return;
+                 
+            }
+
+            int rows = read_int(image_file);
+            int cols = read_int(image_file);
+
+            std::vector<MatrixXd> images;
+            for (int i = 0; i < num_images; i++) {
+                MatrixXd image(1, rows*cols);
+                for (int r = 0; r < rows*cols; r++) {
+                    unsigned char pixel;
+                    image_file.read(reinterpret_cast<char*>(&pixel), 1);
+                    image(0, r) = static_cast<double>(pixel) / 255.0;
+                }
+                unsigned char label;
+                label_file.read(reinterpret_cast<char*>(&label), 1);
+                MatrixXd target = MatrixXd::Zero(1, 10);
+                target(0, label) = 1.0;
+                dataset.push_back({image, target});
+            }
+        }
+
+        std::vector<std::pair<MatrixXd, MatrixXd>> get_dataset() {
+            return dataset;
+        }
+};
+
 
 int main() {
+    //std::vector<std::string> filenames = {"cifar-10-batches-bin/data_batch_1.bin"};
+    //std::vector<std::string> test_filenames = {"cifar-10-batches-bin/test_batch.bin"}; 
+    //"cifar-10-batches-bin/data_batch_2.bin", "cifar-10-batches-bin/data_batch_3.bin", 
+    //"cifar-10-batches-bin/data_batch_4.bin", "cifar-10-batches-bin/data_batch_5.bin"};
+    std::string training_images = "mnist/train-images.idx3-ubyte";
+    std::string training_labels = "mnist/train-labels.idx1-ubyte";
+    std::string test_images = "mnist/t10k-images.idx3-ubyte";
+    std::string test_labels = "mnnist/t10k-labels.idx1-ubyte";
+
+    MnistData training_mnist(training_images, training_labels);
+    MnistData test_mnist(test_images, test_labels);
+    std::vector<std::pair<MatrixXd, MatrixXd>> training_dataset = training_mnist.get_dataset();
+    std::vector<std::pair<MatrixXd, MatrixXd>> test_dataset = test_mnist.get_dataset();
     
-    /*NeuralNetwork model;
 
-    model.add(std::make_unique<DenseLayer>(3, 6));
-    model.add(std::make_unique<OutputLayer>(6, 3));
+    /*Cifar10data cifar(filenames);
+    std::vector<std::pair<MatrixXd, MatrixXd>> dataset = cifar.get_dataset();
 
-    std::vector<MatrixXd> X;
-
-    for (int i = 0; i < 1024; i++) {
-        X.push_back(generate_random_matrix(4, 3));
-    }
-
-    std::vector<std::pair<MatrixXd, MatrixXd>> dataset = generate_dataset(X);
-
-    train_model(model, dataset, 10000, 0.1, 32);
-
-    MatrixXd test_input = generate_random_matrix(4, 3);
-    MatrixXd test_output = model.forward(test_input);
-    MatrixXd expected_output = test_input.array().sin();
-    expected_output = (expected_output.array() - expected_output.minCoeff()) / (expected_output.maxCoeff() - expected_output.minCoeff());
-    std::cout << "Test input:\n" << test_input << std::endl;
-    std::cout << "Prediction:\n" << test_output << std::endl;
-    std::cout << "Expected output:\n" << expected_output << std::endl;
-    double accuracy = (test_output - expected_output).array().abs().sum() / test_output.rows();
-    std::cout << "Inaccuracy: " << accuracy*100 << "%" << std::endl;
+    Cifar10data test_cifar(test_filenames);
+    std::vector<std::pair<MatrixXd, MatrixXd>> test_dataset = test_cifar.get_dataset();
     */
 
-    readfile("cifar-10-batches-bin/data_batch_1.bin");
+    NeuralNetwork model;
+
+    model.add(std::make_unique<DenseLayer>(784, 56));
+    model.add(std::make_unique<OutputLayer>(56, 10));
+
+    train_model(model, training_dataset, 1000, 0.1, 100);
+
+    int correct = 0;
+    for (auto& [input, label] : test_dataset) {
+        MatrixXd output = model.forward(input);
+
+        Eigen::Index pred_col;
+        output.row(0).maxCoeff(&pred_col);
+
+        Eigen::Index label_col;
+        label.row(0).maxCoeff(&label_col);
+
+        if (pred_col == label_col) {
+            correct++;
+        }
+
+        std::cout << "Predicted: " << output << std::endl;
+        std::cout << " Actual: " << label << std::endl;
+    }
+
+    double accuracy = static_cast<double>(correct) / test_dataset.size();
+
+    std::cout << "Accuracy: " << accuracy << std::endl;
 
     return 0;
-
 }
