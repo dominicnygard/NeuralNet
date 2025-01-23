@@ -7,10 +7,14 @@
 #include <iterator>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
-#include <unsupported/Eigen/FFT>
-#include <fftw3.h>
-
-
+#include <unsupported/Eigen/AutoDiff>
+#include "Layers.h"
+#include "ConvLayer.h"
+#include "BatchNorm.h"
+#include "Activation.h"
+#include "DenseConstruct.h"
+#include "DenseBlock.h"
+#include "Pooling.h"
 
 using namespace Eigen;
 using namespace std;
@@ -370,277 +374,6 @@ class MnistData {
         }
 };
 
-class Layer {
-    protected:
-        Tensor<double, 4> output, input;
-        int in_channels, out_channels;
-    public:
-        virtual Tensor<double, 4> forward(const Tensor<double, 4>& input) = 0;
-        virtual void backward(const MatrixXd& grad, const MatrixXd& weight = EMPTY) = 0;
-        virtual void update(double learning_rate) = 0;
-        virtual int get_out_chan() = 0;
-        virtual ~Layer() = default;
-};
-
-class ActivationFunction : Layer {
-    private:
-        std::function<Tensor<double, 4>(const Tensor<double, 4>&)> activation_func;
-        std::function<Tensor<double, 4>(const Tensor<double, 4>&, const Tensor<double, 4>&)> grad_func;
-    public:
-        explicit ActivationFunction(int input_chan, std::function<Tensor<double, 4>(const Tensor<double, 4>&)> activation_func,
-                                std::function<Tensor<double, 4>(const Tensor<double, 4>&, const Tensor<double, 4>&)> grad_func = nullptr) {
-                                    in_channels = input_chan;
-                                    out_channels = input_chan;
-                                    this->activation_func = std::move(activation_func);
-                                    this->grad_func = std::move(grad_func);
-                                }
-
-        Tensor<double, 4> forward(const Tensor<double, 4> &input) override {
-            this->input = input;
-            output = activation_func(input);
-            return output;
-        }
-
-        int get_out_chan() override{
-            return out_channels;
-        }
-
-        void backward(const MatrixXd& grad, const MatrixXd& weight = EMPTY) {};
-        void update(double learning_rate) {};
-};
-
-class PoolingLayer : Layer {
-    public:
-        enum PoolingType {MAX, AVERAGE};
-        enum Mode {REGULAR, GLOBAL};
-
-        PoolingLayer(int input_chan, PoolingType type, int pool_size, int stride, Mode mode = REGULAR) {
-            this->type = type;
-            this->pool_size = pool_size;
-            this->stride = stride;
-            this->mode = mode;
-            this->in_channels = input_chan;
-            out_channels = input_chan;
-        }
-
-        Tensor<double, 4> forward(const Tensor<double, 4> &input) override {
-            int batch_size = input.dimension(0);
-            int channels = input.dimension(1);
-            int height = input.dimension(2);
-            int width = input.dimension(3);
-
-            if (mode == GLOBAL) {
-                Tensor<double, 4> output(batch_size, channels, 1, 1);
-                output.setZero();
-
-                for (int b = 0; b < batch_size; b++) {
-                    for (int c = 0; c < channels; c++) {
-                        Tensor<double, 2> feature_map = input.chip(b, 0).chip(c, 0);
-                        feature_map.maximum();
-                        if (type == MAX) {
-                            Tensor<double, 0> max_val_scl = feature_map.maximum();
-                            double max_val = max_val_scl(0);
-                            output(b, c, 0, 0) = max_val;
-                        } else {
-                            Tensor<double, 0> mean_val_scl = feature_map.mean();
-                            double mean_val = mean_val_scl(0);
-                            output(b, c, 0, 0) = mean_val;
-                        }
-                         
-                    }
-                }
-                return output;
-            } else {
-                int output_height = (height - pool_size) / stride + 1;
-                int output_width = (width - pool_size) / stride + 1;
-
-                Tensor<double, 4> output(batch_size, channels, output_height, output_width);
-                output.setZero();
-
-                for (int b = 0; b < batch_size; b++) {
-                    for (int c = 0; c < channels; c++ ) {
-                        Tensor<double, 2> feature_map = input.chip(b, 0).chip(c, 0);
-
-                        for (int i = 0; i < output_height; i++) {
-                            for (int j = 0; j < output_width; j++) {
-                                int start_row = i * stride;
-                                int start_col = j * stride;
-
-                                int end_row = std::min(start_row + pool_size, height);
-                                int end_col = std::min(start_col + pool_size, width);
-
-                                auto slice = feature_map.slice(
-                                    Eigen::array<int, 2>({start_row, start_col}),
-                                    Eigen::array<int, 2>({end_row - start_row, end_col - start_col})
-                                );
-
-                                if (type == MAX) {
-                                    Tensor<double, 0> max_val_scl = slice.maximum();
-                                    double max_val = max_val_scl(0);
-                                    output(b, c, i, j) = max_val;
-                                } else {
-                                    Tensor<double, 0> mean_val_scl = slice.mean();
-                                    double mean_val = mean_val_scl(0);
-                                    output(b, c, i, j) = mean_val;
-                                }
-
-                            }
-                        }
-                    }
-                }
-                return output;
-            }
-        }
-
-        int get_out_chan() override{
-            return out_channels;
-        }
-
-        void backward(const MatrixXd& grad, const MatrixXd& weight = EMPTY) override {}
-        void update(double learnign_rate) override {}
-    private:
-        PoolingType type;
-        int pool_size;
-        int stride;
-        Mode mode;
-};
-
-class BatchNorm : Layer {
-    private:
-        Tensor<double, 1> weights;
-        Tensor<double, 1> biases;
-        const double epsilon = 1e-6;
-
-    public:
-        BatchNorm(int in_channels) {
-            this->out_channels = in_channels;
-            weights = Tensor<double, 1>(in_channels);
-            biases = Tensor<double, 1>(in_channels);
-
-            weights.setConstant(1.0);
-            biases.setConstant(0.0);
-        };
-
-        Tensor<double, 4> forward(const Tensor<double, 4> &input) override {
-            int batches = input.dimension(0);
-            int channels = input.dimension(1);
-            int cols = input.dimension(2);
-            int rows = input.dimension(3);
-
-            double num_elements = batches * cols * rows;
-
-            Eigen::array<ptrdiff_t, 3> dimensions({0, 2, 3});
-            Eigen::array<ptrdiff_t, 4> bcast({batches, 1, cols, rows});
-            Eigen::array<ptrdiff_t, 4> resize = {1, channels, 1, 1};
-
-            Tensor<double, 1> mean = input.mean(dimensions);
-
-            auto broadcasted_mean = mean.reshape(resize).broadcast(bcast);
-
-            auto center = (input - broadcasted_mean);
-
-            auto squared_diff = center.square();
-
-            auto variance_sum = squared_diff.sum(dimensions);
-
-            auto variance = variance_sum/num_elements;
-
-            auto broadcasted_var = variance.reshape(resize).broadcast(bcast);
-
-            auto stddev = (broadcasted_var + epsilon).sqrt();
-
-            Tensor<double, 4> normalized = center / stddev;
-
-            return normalized * weights.reshape(resize).broadcast(bcast) + biases.reshape(resize).broadcast(bcast);        
-        }
-
-        int get_out_chan() override{
-            return out_channels;
-        }
-
-        void backward(const MatrixXd& grad, const MatrixXd& weight = EMPTY) override {}
-        void update(double learnign_rate) override {}
-
-};
-
-class ConvLayer : Layer {
-    private:
-        Tensor<double, 1> bias;
-        Tensor<double, 4> weights;
-        MatrixXd dW;
-        MatrixXd db;
-        int kernel_size;
-        int num_filters;
-        int stride;
-        int padding;
-    public:
-        ConvLayer(int in_channels, int num_filters, int kernel_size, int stride = 1, int padding = 1)
-        : kernel_size(kernel_size), num_filters(num_filters), stride(stride), padding(padding) 
-        {
-            out_channels = num_filters;
-            weights = Tensor<double, 4>(num_filters, in_channels, kernel_size, kernel_size);
-            bias = Tensor<double, 1>(num_filters);
-
-            weights.setRandom();
-            bias.setZero();
-        }
-
-        Tensor<double, 4> forward(const Tensor<double, 4>& input) override {
-            int batch_size = input.dimension(0);
-            int in_channels = input.dimension(1);
-            int input_height = input.dimension(2);
-            int input_width = input.dimension(3);
-            
-            int output_size = 0;
-            if (num_filters == 1) {
-                output_size = input_height;
-            } else {
-                output_size = (input_height + 2 * padding - kernel_size) / stride + 1;
-            }
-
-            Tensor<double, 4> output(batch_size, num_filters, output_size, output_size);
-
-            for (int b = 0; b < batch_size; b++) {
-                for (int oc = 0; oc < num_filters; oc++) {
-                    Tensor<double, 2> accumulated_output(output_size, output_size);
-                    accumulated_output.setZero();
-                    for (int ic = 0; ic < in_channels; ic++) {
-                        Tensor<double, 2> image = input.chip(b, 0).chip(ic, 0);
-                        Tensor<double, 2> kernel = weights.chip(oc, 0).chip(ic, 0);
-
-                        Eigen::array<std::pair<int, int>, 2> padding_amount;
-                        padding_amount[0] = std::make_pair(1, 1);
-                        padding_amount[1] = std::make_pair(1, 1);
-
-                        Tensor<double, 2>padded_image = image.pad(padding_amount);
-
-                        Eigen::array<ptrdiff_t, 2> con_dims({0, 1});
-                        Tensor<double, 2> convolved_image = padded_image.convolve(kernel, con_dims);
-                        Tensor<double, 2> output_image(output_size, output_size);
-
-                        for (int i = 0; i < output_size; i++) {
-                            for (int j = 0; j < output_size; j++) {
-                                output_image(i, j) = convolved_image(i * stride, j * stride);
-                            }
-                        }
-                        accumulated_output += output_image;
-                    }
-                    accumulated_output = accumulated_output + bias(oc);
-                    output.chip(b, 0).chip(oc, 0) = TensorMap<Tensor<double, 2>>(accumulated_output.data(), output_size, output_size);
-                }
-            }
-            return output;
-        }
-
-        int get_out_chan() override{
-            return out_channels;
-        }
-
-        void backward(const MatrixXd& grad, const MatrixXd& weight) override {}
-        void update(double learning_rate) override {}
-};
-
-
 namespace Activation {
     Tensor<double, 4> relu(const Tensor<double, 4> &input) {
         return input.cwiseMax(0.0);
@@ -649,6 +382,13 @@ namespace Activation {
     Tensor<double, 4> relu_grad(const Tensor<double, 4> &grad, const Tensor<double, 4> &output) {
         return output;
     }
+}
+
+template<typename LayerType, typename... Args>
+std::unique_ptr<ConstructInfo> makeLayer(Args&&... args) {
+    return std::make_unique<LayerConstructInfo<LayerType, Args...>>(
+        std::forward<Args>(args)...
+    );
 }
 
 int main() {
@@ -705,14 +445,17 @@ int main() {
     */
     int batch_size = 1;
     int in_channels = 3;
-    int height = 32;
-    int width = 32;
+    int height = 230;
+    int width = 230;
     int kernel_size = 3;
     int out_channels = 1;
     int kernel_height = 3;
     int kernel_width = 3;
     int padding = 0;
     int stride = 1;
+
+    using Derivative = Eigen::VectorXd;
+    using ADScalar = Eigen::AutoDiffScalar<Derivative>;
 
     //Tensor<double, 4> tensor(batch_size, in_channels, height, width);
     std::srand(static_cast<unsigned int>(std::time(0)));
@@ -822,17 +565,29 @@ int main() {
         }});*/
 
 
-    ConvLayer conv(3, 1, 1);
-    BatchNorm batch(1);
-    ActivationFunction activationLayer(1, Activation::relu);
-    PoolingLayer pool(1, PoolingLayer::MAX, 7, 2);
+    ConvLayer conv(3, 3, 7, 2);
+    BatchNorm batch(3, 3);
+    ActivationFunction activationLayer(3, 3, Activation::relu);
+    PoolingLayer pool(3, 3, PoolingLayer::MAX, 3, 2);
+    DenseBlock db(3, 32, 4, 3);
+    db.addCompositeLayer(
+        makeLayer<BatchNorm>(),
+        makeLayer<ActivationFunction>(Activation::relu),
+        makeLayer<ConvLayer>(1, 1),
+        makeLayer<BatchNorm>(),
+        makeLayer<ActivationFunction>(Activation::relu),
+        makeLayer<ConvLayer>(3, 1)
+    );
+
     Tensor<double, 4> result = conv.forward(tensor);
     Tensor<double, 4> relu_result = activationLayer.forward(result);
     Tensor<double, 4> norm_result = batch.forward(relu_result);
     Tensor<double, 4> pool_result = pool.forward(norm_result);
+    Tensor<double, 4> dense_result = db.forward(pool_result);
 
-    std::cout << norm_result.dimensions() << std::endl;
-    std::cout << pool_result.dimensions() << std::endl;
+
+    std::cout << result.dimensions() << std::endl;
+    std::cout << dense_result.dimensions() << std::endl;
 
     /*for (int b = 0; b < tensor.dimension(0); b++) {
         for (int c = 0; c < tensor.dimension(1); c++) {
@@ -849,6 +604,27 @@ int main() {
 
     Tensor<double, 4> test(2, 3, 2, 2);
     test.setValues(
+    {{{{3, 3},
+    {3, 3}},
+    {{2, 2},
+    {2, 2}},
+    {
+        {1, 2},
+        {3, 4}
+    }},
+    {
+        {{3, 3},
+    {3, 3}},
+    {{2, 2},
+    {2, 2}},
+    {
+        {2, 2},
+        {3, 4}
+    }
+    }});
+
+    Tensor<double, 4> test2(2, 3, 2, 2);
+    test2.setValues(
     {{{{3, 3},
     {3, 3}},
     {{2, 2},
@@ -897,92 +673,6 @@ int main() {
     return 0;
 }
 
-class ConstructInfo {
-    public:
-        virtual std::unique_ptr<Layer> construct(int in_channels) = 0;
-        virtual ~ConstructInfo() = default;
-};
 
-template<typename LayerType, typename... Args>
-class LayerConstructInfo : ConstructInfo {
-    private:
-        std::tuple<Args...> construction_args;
-    public:
-        LayerConstructInfo (Args... args)
-            : construction_args(std::forward<Args>(args)...) {}
-
-        std::unique_ptr<Layer> construct(int in_channels) override {
-            return constructHelper(in_channels, std::make_index_sequence<sizeof...(Args)>{});
-        }
-
-    private:
-        template<size_t... Is>
-        std::unique_ptr<Layer> constructHelper(int in_channels, std::index_sequence<Is...>) {
-            return std::make_unique<LayerType>(
-                in_channels,
-                std::get<Is>(construction_args)...
-            );
-        }
-};
-
-class DenseLayerComposite {
-    private:
-        std::vector<std::unique_ptr<Layer>> layers;
-        std::vector<std::unique_ptr<ConstructInfo>> layer_constructors;
-        int growth_rate;
-        bool is_initialized = false;
-    public:
-        DenseLayerComposite(int growth_rate, std::vector<std::unique_ptr<ConstructInfo>> constructors)
-            : layer_constructors(std::move(constructors)), growth_rate(growth_rate) {}
-
-        int initialize(int in_channels) {
-            if (is_initialized) return 0;
-
-            int layer_in = in_channels;
-            for (size_t i = 0; i < layer_constructors.size(); i++) {
-                layer_in = (i == layer_constructors.size() - 1 ) ? layer_in : layer_in;
-                layers.push_back(layer_constructors[i]->construct(layer_in));
-                layer_in = layers[i]->get_out_chan();
-            }
-
-            is_initialized = true;
-            return layer_in;
-        }
-
-        Tensor<double, 4> forward(const Tensor<double, 4> &input) {
-            Tensor<double, 4> output = input;
-
-            for (const auto& layer : layers) {
-                output = layer->forward(output);
-            }
-            return output;
-        }
-};
-
-class DenseBlock {
-    private:
-        std::vector<std::unique_ptr<DenseLayerComposite>> layers;
-        int growth_rate;
-        int initial_channels;
-        bool is_initalized = false;
-
-    public:
-        DenseBlock(int input_channels, int growth_rate) : growth_rate(growth_rate), initial_channels(input_channels) {}
-
-        template<typename... LayerInfos>
-        void addCompositeLayer(LayerInfos... infos) {
-            std::vector<std::unique_ptr<ConstructInfo>> constructors;
-            (constructors.push_back(std::move(infos)), ...);
-
-            layers.push_back(std::make_unique<DenseLayerComposite>(growth_rate, std::move(constructors)));
-        }
-
-        void initialize() {
-            if (is_initalized) return;
-
-            int current_channel = initial_channels;
-            for (auto& layer : layers) {
-
-            }
-        }
-};
+//TODO
+//Make dense block creation more modular, instead of being static

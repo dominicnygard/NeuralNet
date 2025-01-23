@@ -5,3 +5,4 @@ cifar-10-batches-bin
 mnist
 test.py
 valgrind-out.txt
+build
