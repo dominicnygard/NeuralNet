@@ -5,7 +5,6 @@
 #include <random>
 #include <cmath>
 #include <iterator>
-#include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <unsupported/Eigen/AutoDiff>
 #include "Layers.h"
@@ -19,56 +18,56 @@
 using namespace Eigen;
 using namespace std;
 
-Eigen::MatrixXd EMPTY(0,0);
+Eigen::MatrixXf EMPTY(0,0);
 
-MatrixXd sigmoid(const MatrixXd& x) {
-    return 1.0 / (1.0 + (-x).array().exp());
+MatrixXf sigmoid(const MatrixXf& x) {
+    return 1.0f / (1.0f + (-x).array().exp());
 }
 
-MatrixXd sigmoid_derivative(const MatrixXd& x) {
-    MatrixXd s = sigmoid(x);
-    return s.array() * (1.0 - s.array());
+MatrixXf sigmoid_derivative(const MatrixXf& x) {
+    MatrixXf s = sigmoid(x);
+    return s.array() * (1.0f - s.array());
 }
 
-MatrixXd relu_derivative(const MatrixXd& x) {
-    return (x.array() > 0.0).cast<double>();
+MatrixXf relu_derivative(const MatrixXf& x) {
+    return (x.array() > 0.0).cast<float>();
 }
 
 /*class Layer {
     public:
-        MatrixXd output, input, weights;
+        MatrixXf output, input, weights;
 
-        virtual void forward(const MatrixXd& input) = 0;
-        virtual void backward(const MatrixXd& grad, const MatrixXd& weight = EMPTY) = 0;
-        virtual void update(double learning_rate) = 0;
+        virtual void forward(const MatrixXf& input) = 0;
+        virtual void backward(const MatrixXf& grad, const MatrixXf& weight = EMPTY) = 0;
+        virtual void update(float learning_rate) = 0;
         virtual ~Layer() = default;
 };
 
 class DenseLayer : public Layer {
     private:
-        MatrixXd bias;
-        MatrixXd dW;
-        MatrixXd db;
+        MatrixXf bias;
+        MatrixXf dW;
+        MatrixXf db;
     public:
 
         DenseLayer(int input_size, int output_size) {
-            weights = MatrixXd::Random(input_size, output_size) * sqrt(2.0/input_size);
-            bias = MatrixXd::Zero(1, output_size);
+            weights = MatrixXf::Random(input_size, output_size) * sqrt(2.0/input_size);
+            bias = MatrixXf::Zero(1, output_size);
         }
 
-        void forward(const MatrixXd& input) override {
+        void forward(const MatrixXf& input) override {
             this->input = input;
             output = relu((input*weights) + bias.replicate(input.rows(), 1));
         }
 
-        void backward(const MatrixXd& grad, const MatrixXd& weight) override {
-            MatrixXd error = grad * weight.transpose();
+        void backward(const MatrixXf& grad, const MatrixXf& weight) override {
+            MatrixXf error = grad * weight.transpose();
             output = relu_derivative(output).array() * error.array();
             dW = (input.transpose() * output);
             db = output.colwise().sum() / input.rows();
         }
 
-        void update(double learning_rate) override {
+        void update(float learning_rate) override {
             weights -= learning_rate * dW;
             bias -= learning_rate * db;
         }
@@ -84,13 +83,13 @@ class DenseBlock {
             }
         }
 
-        Eigen::MatrixXd forward(const Eigen::MatrixXd& input) {
-            Eigen::MatrixXd current_input = input;
-            Eigen::MatrixXd concat_output = input;
+        Eigen::MatrixXf forward(const Eigen::MatrixXf& input) {
+            Eigen::MatrixXf current_input = input;
+            Eigen::MatrixXf concat_output = input;
 
             for (auto& layer : layers) {
                 layer->forward(current_input);
-                Eigen::MatrixXd output = layer->output;
+                Eigen::MatrixXf output = layer->output;
                 concat_output.conservativeResize(concat_output.rows(), concat_output.cols() + output.cols());
                 concat_output.rightCols(output.cols()) = output;
                 current_input = concat_output;
@@ -101,29 +100,29 @@ class DenseBlock {
 
 class OutputLayer : public Layer  {
     private:
-        MatrixXd bias;
-        MatrixXd dW;
-        MatrixXd db;
+        MatrixXf bias;
+        MatrixXf dW;
+        MatrixXf db;
     public:
         OutputLayer(int input_size, int output_size) {
-            double limit = sqrt(6.0 / (input_size + output_size));
-            weights = MatrixXd::Random(input_size, output_size) * limit;
-            bias = MatrixXd::Zero(1, output_size);
+            float limit = sqrt(6.0 / (input_size + output_size));
+            weights = MatrixXf::Random(input_size, output_size) * limit;
+            bias = MatrixXf::Zero(1, output_size);
         }
 
-        void forward(const MatrixXd& input) override {
+        void forward(const MatrixXf& input) override {
             this->input = input;
             output = sigmoid((input*weights) + bias.replicate(input.rows(), 1));
         }
 
-        void backward(const MatrixXd& grad, const MatrixXd& weight) override {
-            MatrixXd sigmoid = sigmoid_derivative(output);
+        void backward(const MatrixXf& grad, const MatrixXf& weight) override {
+            MatrixXf sigmoid = sigmoid_derivative(output);
             output = grad.array() * sigmoid.array(); 
             dW = (input.transpose() * output);
             db = output.colwise().sum();
         }
 
-        void update(double learning_rate) override {
+        void update(float learning_rate) override {
             weights -= learning_rate * dW;
             bias -= learning_rate * db;
         }
@@ -139,8 +138,8 @@ class NeuralNetwork {
             layers.push_back(std::move(layer));
         }
 
-        MatrixXd forward(const MatrixXd& input) {
-            MatrixXd out = input;
+        MatrixXf forward(const MatrixXf& input) {
+            MatrixXf out = input;
 
             for (auto& layer : layers) {
                 layer->forward(out);
@@ -150,9 +149,9 @@ class NeuralNetwork {
             return out;
         }
 
-        void backward(const MatrixXd& grad_output) {
-            MatrixXd grad = grad_output;
-            MatrixXd weight;
+        void backward(const MatrixXf& grad_output) {
+            MatrixXf grad = grad_output;
+            MatrixXf weight;
             for (auto it = layers.rbegin(); it != layers.rend(); ++it) {
                 (*it)->backward(grad, weight);
                 grad = (*it)->output;
@@ -160,17 +159,17 @@ class NeuralNetwork {
             }
         }
 
-        void update(double learning_rate) {
+        void update(float learning_rate) {
             for (auto& layer : layers) {
                 layer->update(learning_rate);
             }
         }
 };
 
-MatrixXd generate_random_matrix(int rows, int cols) {
+MatrixXf generate_random_matrix(int rows, int cols) {
     static std::mt19937 rng(std::random_device{}());
-    static std::uniform_real_distribution<double> dist(-1.0, 1.0);
-    MatrixXd mat(rows, cols);
+    static std::uniform_real_distribution<float> dist(-1.0, 1.0);
+    MatrixXf mat(rows, cols);
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
             mat(i, j) = dist(rng);
@@ -181,18 +180,18 @@ MatrixXd generate_random_matrix(int rows, int cols) {
 
 */
 
-std::vector<std::pair<MatrixXd, MatrixXd>> generate_dataset(std::vector<MatrixXd>& X) {
-    std::vector<std::pair<MatrixXd, MatrixXd>> dataset;
+std::vector<std::pair<MatrixXf, MatrixXf>> generate_dataset(std::vector<MatrixXf>& X) {
+    std::vector<std::pair<MatrixXf, MatrixXf>> dataset;
 
     for (auto& x : X) {
-        MatrixXd y = x.array().sin();
+        MatrixXf y = x.array().sin();
         y = (y.array() - y.minCoeff()) / (y.maxCoeff() - y.minCoeff());
         dataset.push_back({x, y});
     }
     return dataset;
 }
 
-/*void visualize_layer(const MatrixXd& activations, int layer_num) {
+/*void visualize_layer(const MatrixXf& activations, int layer_num) {
     std::ofstream outfile("layer" + std::to_string(layer_num) + "_activations.txt");
 
     for (int i = 0; i < activations.rows(); i++) {
@@ -213,24 +212,24 @@ std::vector<std::pair<MatrixXd, MatrixXd>> generate_dataset(std::vector<MatrixXd
     system(("gnuplot plot_layer" + std::to_string(layer_num) + ".gp").c_str());
 }*/
 /*
-void train_model(NeuralNetwork& model, const std::vector<std::pair<MatrixXd, MatrixXd>>& dataset, int epochs, double learning_rate, int batch_size) {
+void train_model(NeuralNetwork& model, const std::vector<std::pair<MatrixXf, MatrixXf>>& dataset, int epochs, float learning_rate, int batch_size) {
     int num_batches = dataset.size() / batch_size;
 
     for (int epoch = 0; epoch < epochs; epoch++) {
-        double epoch_loss = 0.0;
+        float epoch_loss = 0.0;
 
         auto shuffled_dataset = dataset;
         std::random_shuffle(shuffled_dataset.begin(), shuffled_dataset.end());
-        double previous_loss = std::numeric_limits<double>::max();
+        float previous_loss = std::numeric_limits<float>::max();
         for (int batch = 0; batch < num_batches; batch++) {
-            std::vector<MatrixXd> X_batch, y_batch;
+            std::vector<MatrixXf> X_batch, y_batch;
             for (int i = 0; i < batch_size; i++) {
                 X_batch.push_back(shuffled_dataset[batch * batch_size + i].first);
                 y_batch.push_back(shuffled_dataset[batch * batch_size + i].second);
             }
 
-            MatrixXd predictions = MatrixXd::Zero(y_batch[0].rows(), y_batch[0].cols());
-            MatrixXd batch_targets = MatrixXd::Zero(y_batch[0].rows(), y_batch[0].cols());
+            MatrixXf predictions = MatrixXf::Zero(y_batch[0].rows(), y_batch[0].cols());
+            MatrixXf batch_targets = MatrixXf::Zero(y_batch[0].rows(), y_batch[0].cols());
             for (size_t i = 0; i < batch_size; i++) {
                 predictions += model.forward(X_batch[i]);
                 batch_targets += y_batch[i];
@@ -238,10 +237,10 @@ void train_model(NeuralNetwork& model, const std::vector<std::pair<MatrixXd, Mat
             predictions /= batch_size;
             batch_targets /= batch_size;
 
-            double batch_loss = (predictions - batch_targets).array().square().sum() / predictions.rows();
+            float batch_loss = (predictions - batch_targets).array().square().sum() / predictions.rows();
             epoch_loss += batch_loss;          
 
-            MatrixXd grad = 2 * (predictions - batch_targets) / predictions.rows();
+            MatrixXf grad = 2 * (predictions - batch_targets) / predictions.rows();
             model.backward(grad);
             model.update(learning_rate);
         }
@@ -265,7 +264,7 @@ void train_model(NeuralNetwork& model, const std::vector<std::pair<MatrixXd, Mat
 class Cifar10data {
     private:
         std::vector<std::string> filenames;
-        std::vector<std::pair<MatrixXd, MatrixXd>> dataset;
+        std::vector<std::pair<MatrixXf, MatrixXf>> dataset;
     public:
         Cifar10data(std::vector<std::string> &filenames) {
             this->filenames = filenames;
@@ -284,12 +283,12 @@ class Cifar10data {
                     std::vector<unsigned char> bytes(3073);
                     file.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
 
-                    MatrixXd image(1, 3072);
+                    MatrixXf image(1, 3072);
                     for (int j = 0; j < 3072; j++) {
-                        image(0, j) = static_cast<double>(bytes[j + 1]) / 255.0;
+                        image(0, j) = static_cast<float>(bytes[j + 1]) / 255.0;
                     }
 
-                    MatrixXd label = MatrixXd::Zero(1, 10);
+                    MatrixXf label = MatrixXf::Zero(1, 10);
                     label(0, bytes[0]) = 1.0;
 
                     dataset.push_back({image, label});
@@ -300,7 +299,7 @@ class Cifar10data {
             }
         }
 
-        std::vector<std::pair<MatrixXd, MatrixXd>> get_dataset() {
+        std::vector<std::pair<MatrixXf, MatrixXf>> get_dataset() {
             return dataset;
         }
 };
@@ -309,7 +308,7 @@ class MnistData {
     private:
         std::string images;
         std::string labels;
-        std::vector<std::pair<MatrixXd, MatrixXd>> dataset;
+        std::vector<std::pair<MatrixXf, MatrixXf>> dataset;
     public:
         MnistData(std::string &images, std::string &labels) {
             this->images = images;
@@ -353,33 +352,33 @@ class MnistData {
             int rows = read_int(image_file);
             int cols = read_int(image_file);
 
-            std::vector<MatrixXd> images;
+            std::vector<MatrixXf> images;
             for (int i = 0; i < num_images; i++) {
-                MatrixXd image(1, rows*cols);
+                MatrixXf image(1, rows*cols);
                 for (int r = 0; r < rows*cols; r++) {
                     unsigned char pixel;
                     image_file.read(reinterpret_cast<char*>(&pixel), 1);
-                    image(0, r) = static_cast<double>(pixel) / 255.0;
+                    image(0, r) = static_cast<float>(pixel) / 255.0f;
                 }
                 unsigned char label;
                 label_file.read(reinterpret_cast<char*>(&label), 1);
-                MatrixXd target = MatrixXd::Zero(1, 10);
-                target(0, label) = 1.0;
+                MatrixXf target = MatrixXf::Zero(1, 10);
+                target(0, label) = 1.0f;
                 dataset.push_back({image, target});
             }
         }
 
-        std::vector<std::pair<MatrixXd, MatrixXd>> get_dataset() {
+        std::vector<std::pair<MatrixXf, MatrixXf>> get_dataset() {
             return dataset;
         }
 };
 
 namespace Activation {
-    Tensor<double, 4> relu(const Tensor<double, 4> &input) {
-        return input.cwiseMax(0.0);
+    Tensor<float, 4> relu(const Tensor<float, 4> &input) {
+        return input.cwiseMax(0.0f);
     }
 
-    Tensor<double, 4> relu_grad(const Tensor<double, 4> &grad, const Tensor<double, 4> &output) {
+    Tensor<float, 4> relu_grad(const Tensor<float, 4> &grad, const Tensor<float, 4> &output) {
         return output;
     }
 }
@@ -403,15 +402,15 @@ int main() {
 
     MnistData training_mnist(training_images, training_labels);
     MnistData test_mnist(test_images, test_labels);
-    std::vector<std::pair<MatrixXd, MatrixXd>> training_dataset = training_mnist.get_dataset();
-    std::vector<std::pair<MatrixXd, MatrixXd>> test_dataset = test_mnist.get_dataset();*/
+    std::vector<std::pair<MatrixXf, MatrixXf>> training_dataset = training_mnist.get_dataset();
+    std::vector<std::pair<MatrixXf, MatrixXf>> test_dataset = test_mnist.get_dataset();*/
     
 
     /*Cifar10data cifar(filenames);
-    std::vector<std::pair<MatrixXd, MatrixXd>> dataset = cifar.get_dataset();
+    std::vector<std::pair<MatrixXf, MatrixXf>> dataset = cifar.get_dataset();
 
     Cifar10data test_cifar(test_filenames);
-    std::vector<std::pair<MatrixXd, MatrixXd>> test_dataset = test_cifar.get_dataset();
+    std::vector<std::pair<MatrixXf, MatrixXf>> test_dataset = test_cifar.get_dataset();
     */
 
     //NeuralNetwork model;
@@ -423,7 +422,7 @@ int main() {
 
     int correct = 0;
     for (auto& [input, label] : test_dataset) {
-        MatrixXd output = model.forward(input);
+        MatrixXf output = model.forward(input);
 
         Eigen::Index pred_col;
         output.row(0).maxCoeff(&pred_col);
@@ -439,7 +438,7 @@ int main() {
         std::cout << " Actual: " << label << std::endl;
     }
 
-    double accuracy = static_cast<double>(correct) / test_dataset.size();
+    float accuracy = static_cast<float>(correct) / test_dataset.size();
 
     std::cout << "Accuracy: " << accuracy << std::endl;
     */
@@ -457,13 +456,13 @@ int main() {
     using Derivative = Eigen::VectorXd;
     using ADScalar = Eigen::AutoDiffScalar<Derivative>;
 
-    //Tensor<double, 4> tensor(batch_size, in_channels, height, width);
+    //Tensor<float, 4> tensor(batch_size, in_channels, height, width);
     std::srand(static_cast<unsigned int>(std::time(0)));
 
     int output_height = height - kernel_size + 1;  // 5 - 3 + 1 = 3
     int output_width = width - kernel_size + 1;
     
-    Tensor<double, 4> tensor(1, 3, height, width);
+    Tensor<float, 4> tensor(1, 3, height, width);
     tensor.setRandom();
     /*tensor.setValues({{{
         {  1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32},
@@ -579,11 +578,11 @@ int main() {
         makeLayer<ConvLayer>(3, 1)
     );
 
-    Tensor<double, 4> result = conv.forward(tensor);
-    Tensor<double, 4> relu_result = activationLayer.forward(result);
-    Tensor<double, 4> norm_result = batch.forward(relu_result);
-    Tensor<double, 4> pool_result = pool.forward(norm_result);
-    Tensor<double, 4> dense_result = db.forward(pool_result);
+    Tensor<float, 4> result = conv.forward(tensor);
+    Tensor<float, 4> relu_result = activationLayer.forward(result);
+    Tensor<float, 4> norm_result = batch.forward(relu_result);
+    Tensor<float, 4> pool_result = pool.forward(norm_result);
+    Tensor<float, 4> dense_result = db.forward(pool_result);
 
 
     std::cout << result.dimensions() << std::endl;
@@ -602,7 +601,7 @@ int main() {
         std::cout << std::endl;
     }*/
 
-    Tensor<double, 4> test(2, 3, 2, 2);
+    Tensor<float, 4> test(2, 3, 2, 2);
     test.setValues(
     {{{{3, 3},
     {3, 3}},
@@ -623,7 +622,7 @@ int main() {
     }
     }});
 
-    Tensor<double, 4> test2(2, 3, 2, 2);
+    Tensor<float, 4> test2(2, 3, 2, 2);
     test2.setValues(
     {{{{3, 3},
     {3, 3}},
@@ -644,7 +643,7 @@ int main() {
     }
     }});
 
-    Tensor<double, 4> newt_test(1, 1, 4, 4);
+    Tensor<float, 4> newt_test(1, 1, 4, 4);
     newt_test.setValues({{{{1, 2, 3, 4},
                             {5, 6, 7, 8},
                             {9, 10, 11, 12},
@@ -653,7 +652,7 @@ int main() {
 
     
     //PoolingLayer pool(PoolingLayer::AVERAGE, 2, 2);
-    //Tensor<double, 4> poolTEst = pool.forward(newt_test);
+    //Tensor<float, 4> poolTEst = pool.forward(newt_test);
 
     //std::vector<std::unique_ptr<Layer>> denseBlockLayers;
 
@@ -661,11 +660,11 @@ int main() {
 
     //std::cout << poolTEst << std::endl;
 
-    Tensor<double, 2> chipped = test.chip(0, 0).chip(0, 0);
-    Tensor<double, 4> out(1, 1, 1, 1);
+    Tensor<float, 2> chipped = test.chip(0, 0).chip(0, 0);
+    Tensor<float, 4> out(1, 1, 1, 1);
     out.setZero();
-    Tensor<double, 0> max_val = chipped.maximum();
-    double new_max = max_val(0);
+    Tensor<float, 0> max_val = chipped.maximum();
+    float new_max = max_val(0);
     out(0, 0, 0, 0) = new_max;
 
     std::cout << out << std::endl;

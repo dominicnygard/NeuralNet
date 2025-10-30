@@ -5,8 +5,8 @@
 
 class ConvLayer : public Layer {
     private:
-        Tensor<double, 1> bias;
-        Tensor<double, 4> weights;
+        Tensor<float, 1> bias;
+        Tensor<float, 4> weights;
         MatrixXd dW;
         MatrixXd db;
         int kernel_size;
@@ -16,10 +16,10 @@ class ConvLayer : public Layer {
     public:
         ConvLayer(int in_channels, int num_filters, int kernel_size, int stride = 1, int padding = 1);
 
-        Tensor<double, 4> forward(const Tensor<double, 4>& input) override;
+        Tensor<float, 4> forward(const Tensor<float, 4>& input) override;
 
         void backward(const MatrixXd& grad) override {}
-        void update(double learning_rate) override {}
+        void update(float learning_rate) override {}
 };
 
 #endif

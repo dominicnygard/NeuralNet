@@ -3,26 +3,26 @@
 BatchNorm::BatchNorm(int in_channels, int out_channels) {
     this->in_channels = in_channels;
     this->out_channels = out_channels;
-    weights = Tensor<double, 1>(in_channels);
-    biases = Tensor<double, 1>(in_channels);
+    weights = Tensor<float, 1>(in_channels);
+    biases = Tensor<float, 1>(in_channels);
 
-    weights.setConstant(1.0);
-    biases.setConstant(0.0);
+    weights.setConstant(1.0f);
+    biases.setConstant(0.0f);
 }
 
-Tensor<double, 4> BatchNorm::forward(const Tensor<double, 4> &input) {
+Tensor<float, 4> BatchNorm::forward(const Tensor<float, 4> &input) {
     int batches = input.dimension(0);
     int channels = input.dimension(1);
     int cols = input.dimension(2);
     int rows = input.dimension(3);
 
-    double num_elements = batches * cols * rows;
+    float num_elements = batches * cols * rows;
 
     Eigen::array<ptrdiff_t, 3> dimensions({0, 2, 3});
     Eigen::array<ptrdiff_t, 4> bcast({batches, 1, cols, rows});
     Eigen::array<ptrdiff_t, 4> resize = {1, channels, 1, 1};
 
-    Tensor<double, 1> mean = input.mean(dimensions);
+    Tensor<float, 1> mean = input.mean(dimensions);
 
     auto broadcasted_mean = mean.reshape(resize).broadcast(bcast);
 
@@ -38,7 +38,7 @@ Tensor<double, 4> BatchNorm::forward(const Tensor<double, 4> &input) {
 
     auto stddev = (broadcasted_var + epsilon).sqrt();
 
-    Tensor<double, 4> normalized = center / stddev;
+    Tensor<float, 4> normalized = center / stddev;
 
     return normalized * weights.reshape(resize).broadcast(bcast) + biases.reshape(resize).broadcast(bcast);
 }

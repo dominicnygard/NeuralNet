@@ -12,9 +12,9 @@ void DenseBlock::initialize() {
     }
 }
 
-Tensor<double, 4> DenseBlock::forward(const Tensor<double, 4> &input) {
-    Tensor<double, 4> output = input;
-    Tensor<double, 4> original_input = input;
+Tensor<float, 4> DenseBlock::forward(const Tensor<float, 4> &input) {
+    Tensor<float, 4> output = input;
+    Tensor<float, 4> original_input = input;
     for (int i = 0; i < layer_count; i++) {
         original_input = output;
         for (auto& layer : layers) {

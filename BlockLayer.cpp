@@ -19,8 +19,8 @@ void DenseLayerComposite::initialize(int in_channels) {
     is_initialized = true;
 }
 
-Tensor<double, 4> DenseLayerComposite::forward(const Tensor<double, 4> &input) {
-    Tensor<double, 4> output = input;
+Tensor<float, 4> DenseLayerComposite::forward(const Tensor<float, 4> &input) {
+    Tensor<float, 4> output = input;
 
     for (const auto& layer : layers) {
         output = layer->forward(output);

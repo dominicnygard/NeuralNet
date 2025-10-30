@@ -26,7 +26,7 @@ class DenseBlock {
         }
 
         void initialize();
-        Tensor<double, 4> forward(const Tensor<double, 4> &input);
+        Tensor<float, 4> forward(const Tensor<float, 4> &input);
 };
 
 #endif

@@ -2,19 +2,19 @@
 #define BATCHNORM_H
 #include "Layers.h"
 
-class BatchNorm : Layer {
+class BatchNorm : public Layer {
     private:
-        Tensor<double, 1> weights;
-        Tensor<double, 1> biases;
-        const double epsilon = 1e-6;
+        Tensor<float, 1> weights;
+        Tensor<float, 1> biases;
+        const float epsilon = 1e-6f;
 
     public:
         BatchNorm(int in_channels, int out_channels);
 
-        Tensor<double, 4> forward(const Tensor<double, 4> &input) override;
+        Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
 
         void backward(const MatrixXd& grad) override {}
-        void update(double learnign_rate) override {}
+        void update(float learnign_rate) override {}
 };
 
 #endif
