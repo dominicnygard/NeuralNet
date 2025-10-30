@@ -6,7 +6,10 @@ ConvLayer::ConvLayer(int in_channels, int num_filters, int kernel_size, int stri
             weights = Tensor<float, 4>(num_filters, in_channels, kernel_size, kernel_size);
             bias = Tensor<float, 1>(num_filters);
 
+            int fan_in = in_channels * kernel_size * kernel_size;
+            float bound = 1.0f / std::sqrt(fan_in);
             weights.setRandom();
+            weights = weights * bound;
             bias.setZero();
         }
 
@@ -16,12 +19,7 @@ Tensor<float, 4> ConvLayer::forward(const Tensor<float, 4> &input) {
     int input_height = input.dimension(2);
     int input_width = input.dimension(3);
     
-    int output_size = 0;
-    if (num_filters == 1) {
-        output_size = input_height;
-    } else {
-        output_size = (input_height + 2 * padding - kernel_size) / stride + 1;
-    }
+    int output_size = (input_height + 2 * padding - kernel_size) / stride + 1;
 
     Tensor<float, 4> output(batch_size, num_filters, output_size, output_size);
 
@@ -34,8 +32,8 @@ Tensor<float, 4> ConvLayer::forward(const Tensor<float, 4> &input) {
                 Tensor<float, 2> kernel = weights.chip(oc, 0).chip(ic, 0);
 
                 Eigen::array<std::pair<int, int>, 2> padding_amount;
-                padding_amount[0] = std::make_pair(1, 1);
-                padding_amount[1] = std::make_pair(1, 1);
+                padding_amount[0] = std::make_pair(padding, padding);
+                padding_amount[1] = std::make_pair(padding, padding);
 
                 Tensor<float, 2>padded_image = image.pad(padding_amount);
 
@@ -51,7 +49,8 @@ Tensor<float, 4> ConvLayer::forward(const Tensor<float, 4> &input) {
                 accumulated_output += output_image;
             }
             accumulated_output = accumulated_output + bias(oc);
-            output.chip(b, 0).chip(oc, 0) = TensorMap<Tensor<float, 2>>(accumulated_output.data(), output_size, output_size);
+            output.chip(b, 0).chip(oc, 0) = accumulated_output;
+            //output.chip(b, 0).chip(oc, 0) = TensorMap<Tensor<float, 2>>(accumulated_output.data(), output_size, output_size);
         }
     }
     return output;

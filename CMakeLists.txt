@@ -8,7 +8,7 @@ set(SOURCES
     main.cpp
     Activation.cpp
     BatchNorm.cpp
-    BlockLayer.cpp
+    DenseLayerComposite.cpp
     ConvLayer.cpp
     DenseBlock.cpp
     Pooling.cpp

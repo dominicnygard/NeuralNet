@@ -8,13 +8,18 @@ class ActivationFunction : public Layer {
         std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func;
         std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func;
     public:
-        explicit ActivationFunction(int input_chan, int output_chan, std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func,
+        explicit ActivationFunction(std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func,
                                 std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func = nullptr);
 
         Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
 
-        void backward(const MatrixXd& grad) {};
+        void backward(const MatrixXf& grad) {};
         void update(float learning_rate) {};
 };
+
+namespace Activation {
+    Tensor<float, 4> relu(const Tensor<float, 4> &input);
+    Tensor<float, 4> relu_grad(const Tensor<float, 4> &grad, const Tensor<float, 4> &output);
+}
 
 #endif

@@ -1,12 +1,10 @@
 #include "Pooling.h"
 
-PoolingLayer::PoolingLayer(int input_chan, int output_chan, PoolingType type, int pool_size, int stride, Mode mode) {
+PoolingLayer::PoolingLayer(PoolingType type, int pool_size, int stride, Mode mode) {
     this->type = type;
     this->pool_size = pool_size;
     this->stride = stride;
     this->mode = mode;
-    in_channels = input_chan;
-    out_channels = output_chan;
 }
 
 Tensor<float, 4> PoolingLayer::forward(const Tensor<float, 4> &input) {
@@ -22,7 +20,6 @@ Tensor<float, 4> PoolingLayer::forward(const Tensor<float, 4> &input) {
         for (int b = 0; b < batch_size; b++) {
             for (int c = 0; c < channels; c++) {
                 Tensor<float, 2> feature_map = input.chip(b, 0).chip(c, 0);
-                feature_map.maximum();
                 if (type == MAX) {
                     Tensor<float, 0> max_val_scl = feature_map.maximum();
                     float max_val = max_val_scl(0);

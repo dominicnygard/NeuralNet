@@ -7,11 +7,11 @@ class PoolingLayer : public Layer {
         enum PoolingType {MAX, AVERAGE};
         enum Mode {REGULAR, GLOBAL};
 
-        PoolingLayer(int input_chan, int output_chan, PoolingType type, int pool_size, int stride, Mode mode = REGULAR); 
+        PoolingLayer(PoolingType type, int pool_size, int stride, Mode mode = REGULAR); 
 
         Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
 
-        void backward(const MatrixXd& grad) override {}
+        void backward(const MatrixXf& grad) override {}
         void update(float learnign_rate) override {}
     private:
         PoolingType type;

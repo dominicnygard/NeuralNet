@@ -13,12 +13,13 @@ class ConvLayer : public Layer {
         int num_filters;
         int stride;
         int padding;
+        int out_channels;
     public:
         ConvLayer(int in_channels, int num_filters, int kernel_size, int stride = 1, int padding = 1);
 
         Tensor<float, 4> forward(const Tensor<float, 4>& input) override;
 
-        void backward(const MatrixXd& grad) override {}
+        void backward(const MatrixXf& grad) override {}
         void update(float learning_rate) override {}
 };
 

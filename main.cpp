@@ -5,13 +5,13 @@
 #include <random>
 #include <cmath>
 #include <iterator>
+#include <iomanip>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <unsupported/Eigen/AutoDiff>
 #include "Layers.h"
 #include "ConvLayer.h"
 #include "BatchNorm.h"
 #include "Activation.h"
-#include "DenseConstruct.h"
 #include "DenseBlock.h"
 #include "Pooling.h"
 
@@ -373,21 +373,46 @@ class MnistData {
         }
 };
 
-namespace Activation {
-    Tensor<float, 4> relu(const Tensor<float, 4> &input) {
-        return input.cwiseMax(0.0f);
-    }
 
-    Tensor<float, 4> relu_grad(const Tensor<float, 4> &grad, const Tensor<float, 4> &output) {
-        return output;
+// Utility function to print 4D tensors for debugging
+void printTensor4D(const Tensor<float, 4>& tensor, const std::string& name = "Tensor", 
+                   int max_channels = -1, int max_height = -1, int max_width = -1) {
+    int batches = tensor.dimension(0);
+    int channels = tensor.dimension(1);
+    int height = tensor.dimension(2);
+    int width = tensor.dimension(3);
+    
+    // Limit what we print if tensor is too large
+    int print_channels = (max_channels > 0 && max_channels < channels) ? max_channels : channels;
+    int print_height = (max_height > 0 && max_height < height) ? max_height : height;
+    int print_width = (max_width > 0 && max_width < width) ? max_width : width;
+    
+    std::cout << "\n========== " << name << " ==========\n";
+    std::cout << "Shape: [" << batches << ", " << channels << ", " << height << ", " << width << "]\n";
+    
+    for (int b = 0; b < batches; b++) {
+        std::cout << "\n--- Batch " << b << " ---\n";
+        for (int c = 0; c < print_channels; c++) {
+            std::cout << "  Channel " << c << ":\n";
+            for (int h = 0; h < print_height; h++) {
+                std::cout << "    ";
+                for (int w = 0; w < print_width; w++) {
+                    std::cout << std::setw(8) << std::setprecision(4) << tensor(b, c, h, w) << " ";
+                }
+                if (print_width < width) {
+                    std::cout << "... (" << (width - print_width) << " more)";
+                }
+                std::cout << "\n";
+            }
+            if (print_height < height) {
+                std::cout << "    ... (" << (height - print_height) << " more rows)\n";
+            }
+        }
+        if (print_channels < channels) {
+            std::cout << "  ... (" << (channels - print_channels) << " more channels)\n";
+        }
     }
-}
-
-template<typename LayerType, typename... Args>
-std::unique_ptr<ConstructInfo> makeLayer(Args&&... args) {
-    return std::make_unique<LayerConstructInfo<LayerType, Args...>>(
-        std::forward<Args>(args)...
-    );
+    std::cout << "====================================\n\n";
 }
 
 int main() {
@@ -462,9 +487,9 @@ int main() {
     int output_height = height - kernel_size + 1;  // 5 - 3 + 1 = 3
     int output_width = width - kernel_size + 1;
     
-    Tensor<float, 4> tensor(1, 3, height, width);
-    tensor.setRandom();
-    /*tensor.setValues({{{
+    Tensor<float, 4> tensor(1, 3, 32, 32);
+    //tensor.setRandom();
+    tensor.setValues({{{
         {  1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32},
         { 33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64},
         { 65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96},
@@ -561,32 +586,49 @@ int main() {
         {929, 930, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 947, 948, 949, 950, 951, 952, 953, 954, 955, 956, 957, 958, 959, 960},
         {961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992},
         {993, 994, 995, 996, 997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024}}
-        }});*/
+        }});
 
+    tensor = tensor / 1024.0f;
+    /*
+    Tensor<float, 4> smallTensor()
 
     ConvLayer conv(3, 3, 7, 2);
     BatchNorm batch(3, 3);
     ActivationFunction activationLayer(3, 3, Activation::relu);
     PoolingLayer pool(3, 3, PoolingLayer::MAX, 3, 2);
-    DenseBlock db(3, 32, 4, 3);
-    db.addCompositeLayer(
-        makeLayer<BatchNorm>(),
-        makeLayer<ActivationFunction>(Activation::relu),
-        makeLayer<ConvLayer>(1, 1),
-        makeLayer<BatchNorm>(),
-        makeLayer<ActivationFunction>(Activation::relu),
-        makeLayer<ConvLayer>(3, 1)
-    );
 
     Tensor<float, 4> result = conv.forward(tensor);
     Tensor<float, 4> relu_result = activationLayer.forward(result);
     Tensor<float, 4> norm_result = batch.forward(relu_result);
     Tensor<float, 4> pool_result = pool.forward(norm_result);
-    Tensor<float, 4> dense_result = db.forward(pool_result);
+    //Tensor<float, 4> dense_result = db.forward(pool_result);
 
-
-    std::cout << result.dimensions() << std::endl;
-    std::cout << dense_result.dimensions() << std::endl;
+    // Print tensor shapes and sample values
+    std::cout << "\n=== Layer Outputs ===\n";
+    std::cout << "Conv output shape: " << result.dimensions() << std::endl;
+    //std::cout << "Dense block output shape: " << dense_result.dimensions() << std::endl;
+    
+    // Use the printTensor4D function to inspect layer outputs
+    // Limit printing to avoid overwhelming output for large tensors
+    printTensor4D(result, "Conv Output", 3, 5, 5);           // First 2 channels, 5x5 pixels
+    printTensor4D(relu_result, "ReLU Output", 1, 3, 3);      // First channel, 3x3 pixels
+    printTensor4D(norm_result, "BatchNorm Output", 1, 3, 3); // First channel, 3x3 pixels
+    printTensor4D(pool_result, "Pooling Output", 2, 4, 4);   // First 2 channels, 4x4 pixels
+    //printTensor4D(dense_result, "DenseBlock Output", 3, 3, 3); // First 3 channels, 3x3 pixels
+    */
+    // Create a simple 3x3 test tensor with values 1-9 for easy convolution testing
+    Tensor<float, 4> simple3x3(1, 1, 3, 3);
+    simple3x3.setValues({{{{1.0f, 2.0f, 3.0f},
+                           {4.0f, 5.0f, 6.0f},
+                           {7.0f, 8.0f, 9.0f}}}});
+    
+    std::cout << "\n=== Testing Convolution with Simple 3x3 Input ===\n";
+    printTensor4D(simple3x3, "Input 3x3 Tensor (1-9)");
+    
+    DenseBlock dense(1, 12, 8);
+    Tensor<float, 4> convOutput = dense.forward(simple3x3);
+    printTensor4D(convOutput, "dense block Output");
+    
 
     /*for (int b = 0; b < tensor.dimension(0); b++) {
         for (int c = 0; c < tensor.dimension(1); c++) {
@@ -660,7 +702,7 @@ int main() {
 
     //std::cout << poolTEst << std::endl;
 
-    Tensor<float, 2> chipped = test.chip(0, 0).chip(0, 0);
+    /*Tensor<float, 2> chipped = test.chip(0, 0).chip(0, 0);
     Tensor<float, 4> out(1, 1, 1, 1);
     out.setZero();
     Tensor<float, 0> max_val = chipped.maximum();
@@ -669,7 +711,7 @@ int main() {
 
     std::cout << out << std::endl;
 
-    return 0;
+    return 0;*/
 }
 
 

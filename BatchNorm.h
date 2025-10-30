@@ -9,11 +9,11 @@ class BatchNorm : public Layer {
         const float epsilon = 1e-6f;
 
     public:
-        BatchNorm(int in_channels, int out_channels);
+        BatchNorm(int in_channels);
 
         Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
 
-        void backward(const MatrixXd& grad) override {}
+        void backward(const MatrixXf& grad) override {}
         void update(float learnign_rate) override {}
 };
 

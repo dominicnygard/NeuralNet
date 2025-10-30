@@ -1,8 +1,6 @@
 #include "BatchNorm.h"
 
-BatchNorm::BatchNorm(int in_channels, int out_channels) {
-    this->in_channels = in_channels;
-    this->out_channels = out_channels;
+BatchNorm::BatchNorm(int in_channels) {
     weights = Tensor<float, 1>(in_channels);
     biases = Tensor<float, 1>(in_channels);
 

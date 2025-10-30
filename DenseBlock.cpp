@@ -1,27 +1,22 @@
 #include "DenseBlock.h"
 
-void DenseBlock::initialize() {
-    if (is_initalized) return;
+DenseBlock::DenseBlock(int input_channels, int growth_rate, int layers) 
+    : growth_rate(growth_rate), initial_channels(input_channels), layer_count(layers) {
 
-    int current_channel = initial_channels;
-    for (int i = 0; i < layer_count; i++) {
-        for (auto& layer : layers) {
-            layer->initialize(current_channel);
-        }
-        current_channel += growth_rate;
+    for(int i = 1; i <= layers; i++) {
+        compositeLayers.push_back(std::make_unique<DenseLayerComposite>(growth_rate, input_channels + growth_rate*(i-1)));
     }
 }
+
 
 Tensor<float, 4> DenseBlock::forward(const Tensor<float, 4> &input) {
-    Tensor<float, 4> output = input;
-    Tensor<float, 4> original_input = input;
-    for (int i = 0; i < layer_count; i++) {
-        original_input = output;
-        for (auto& layer : layers) {
-            output = layer->forward(output);
-        }
-        output = original_input.concatenate(output, 1);
-    }
+    Tensor<float, 4> concatenated = input;
 
-    return output;
+    for (auto& layer : compositeLayers) {
+        Tensor<float, 4> new_features = layer->forward(concatenated);
+        Tensor<float, 4> temp = concatenated.concatenate(new_features, 1);
+        concatenated = temp;
+    }
+    return concatenated;
 }
+

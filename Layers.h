@@ -7,9 +7,8 @@ using namespace Eigen;
 class Layer {
     public:
         Tensor<float, 4> output, input;
-        int in_channels, out_channels;
         virtual Eigen::Tensor<float, 4> forward(const Eigen::Tensor<float, 4>& input) = 0;
-        virtual void backward(const Eigen::MatrixXd& grad) = 0;
+        virtual void backward(const Eigen::MatrixXf& grad) = 0;
         virtual void update(float learning_rate) = 0;
         virtual ~Layer() = default;
 };
