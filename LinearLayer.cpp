@@ -8,15 +8,25 @@ LinearLayer::LinearLayer(int in_features, int out_features) {
     bias.setZero();
 }
 
-Tensor<float, 2> LinearLayer::forward(const Tensor<float, 2>& input) {
-    Tensor<float, 2> output(input.dimension(0), weights.dimension(0));
-    for (int n = 0; n < input.dimension(0); n++) {
-        for (int o = 0; o < weights.dimension(0); o++) {
-            float sum = bias(o);
-            for (int i = 0; i < weights.dimension(1); i++)
-                sum += input(n, i) * weights(o, i);
-            output(n, o) = sum;
+Tensor<float, 4> LinearLayer::forward(const Tensor<float, 4>& input) {
+    this->input = input;
+    int batch_size = input.dimension(0);
+    int in_features = input.dimension(1);
+    int out_features = weights.dimension(0);
+
+    Tensor<float, 4> output(batch_size, out_features, 1, 1);
+    for (int b = 0; b < batch_size; b++) {
+        for (int o = 0; o < out_features; o++) {
+            float sum = 0.0f;
+            for (int i = 0; i < in_features; i++) {
+                sum += input(b, i, 0, 0) * weights(o, i);
+            }
+            output(b, o, 0, 0) = sum + bias(o);
         }
     }
     return output;
+}
+
+Tensor<float, 4> LinearLayer::backward(const MatrixXf& grad) {
+
 }

@@ -14,6 +14,7 @@
 #include "Activation.h"
 #include "DenseBlock.h"
 #include "Pooling.h"
+#include "LinearLayer.h"
 
 using namespace Eigen;
 using namespace std;
@@ -488,11 +489,11 @@ int main() {
     int output_width = width - kernel_size + 1;
     
     Tensor<float, 4> tensor(1, 3, 32, 32);
-    //tensor.setRandom();
-    tensor.setValues({{{
-        {  1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32},
-        { 33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64},
-        { 65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96},
+    tensor.setRandom();
+    /*tensor.setValues({{{
+        {  1024,   2,   3,   4,   50,   6,   7,   8,   9,  1000,  110,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32},
+        { 33,  34,  35,  36,  37,  308,  39,  400,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64},
+        { 65,  66,  67,  68,  69,  700,  71,  72,  73,  74,  75,  706,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96},
         { 97,  98,  99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128},
         {129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160},
         {161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192},
@@ -522,8 +523,8 @@ int main() {
         {929, 930, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 947, 948, 949, 950, 951, 952, 953, 954, 955, 956, 957, 958, 959, 960},
         {961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992},
         {993, 994, 995, 996, 997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024}},
-        {{  1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32},
-        { 33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64},
+        {{  1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  170,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32},
+        { 33,  34,  35,  36,  37,  38,  39,  40,  401,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64},
         { 65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96},
         { 97,  98,  99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128},
         {129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160},
@@ -588,7 +589,7 @@ int main() {
         {993, 994, 995, 996, 997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024}}
         }});
 
-    tensor = tensor / 1024.0f;
+    tensor = tensor / 1024.0f;*/
     /*
     Tensor<float, 4> smallTensor()
 
@@ -616,18 +617,79 @@ int main() {
     printTensor4D(pool_result, "Pooling Output", 2, 4, 4);   // First 2 channels, 4x4 pixels
     //printTensor4D(dense_result, "DenseBlock Output", 3, 3, 3); // First 3 channels, 3x3 pixels
     */
-    // Create a simple 3x3 test tensor with values 1-9 for easy convolution testing
-    Tensor<float, 4> simple3x3(1, 1, 3, 3);
-    simple3x3.setValues({{{{1.0f, 2.0f, 3.0f},
-                           {4.0f, 5.0f, 6.0f},
-                           {7.0f, 8.0f, 9.0f}}}});
+     // Create a proper 224×224 test input for DenseNet (normalized to [0,1])
+     //Tensor<float, 4> testInput(1, 3, 224, 224);
+     //testInput.setRandom();  // Random values in [-1, 1]
+     //testInput = (testInput + 1.0f) * 0.5f;  // Scale to [0, 1]
     
-    std::cout << "\n=== Testing Convolution with Simple 3x3 Input ===\n";
-    printTensor4D(simple3x3, "Input 3x3 Tensor (1-9)");
-    
-    DenseBlock dense(1, 12, 8);
-    Tensor<float, 4> convOutput = dense.forward(simple3x3);
-    printTensor4D(convOutput, "dense block Output");
+    std::vector<std::unique_ptr<Layer>> dense_net;
+    dense_net.push_back(make_unique<ConvLayer>(3, 64, 7, 2, 1));
+    dense_net.push_back(make_unique<BatchNorm>(64));
+    dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
+    dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::MAX, 3, 2));
+    dense_net.push_back(make_unique<DenseBlock>(64, 32, 6));
+    dense_net.push_back(make_unique<ConvLayer>(256, int(256*0.5), 1, 1, 0));
+    dense_net.push_back(make_unique<BatchNorm>(128));
+    dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
+    dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 2, 2));
+    dense_net.push_back(make_unique<DenseBlock>(128, 32, 12));
+    dense_net.push_back(make_unique<ConvLayer>(512, int(512*0.5), 1, 1, 0));
+    dense_net.push_back(make_unique<BatchNorm>(256));
+    dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
+    dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 2, 2));
+    dense_net.push_back(make_unique<DenseBlock>(256, 32, 24));
+    dense_net.push_back(make_unique<ConvLayer>(1024, int(1024*0.5), 1, 1, 0));
+    dense_net.push_back(make_unique<BatchNorm>(512));
+    dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
+    dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 2, 2));
+    dense_net.push_back(make_unique<DenseBlock>(512, 32, 16));
+    dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 7, 1, PoolingLayer::GLOBAL));
+    dense_net.push_back(make_unique<LinearLayer>(1024, 10));
+    dense_net.push_back(make_unique<ActivationFunction>(Activation::softmax));
+
+    Tensor<float, 4> output;
+    output = tensor;
+    for (size_t i = 0; i < dense_net.size(); ++i) {
+        output = dense_net[i]->forward(output);
+        // Print intermediate outputs to debug
+        if (i == 0) {
+            printTensor4D(output, "After first Conv7x7", 5, 3, 3);
+        }
+        if (i == 4) {
+            printTensor4D(output, "After first DenseBlock", 10, 2, 2);
+        }
+        if (i == 12) {
+            printTensor4D(output, "After second DenseBlock", 10, 2, 2);
+        }
+        if (i == 15) {
+            printTensor4D(output, "After third DenseBlock before", 10, 2, 2);
+        }
+        if (i == 16) {
+            printTensor4D(output, "After third DenseBlock", 10, 2, 2);
+        }
+        if (i == dense_net.size() - 6) {
+            printTensor4D(output, "After ReLU before last DenseBlock", 10, 2, 2);
+        }
+        if (i == dense_net.size() - 5) {
+            printTensor4D(output, "Before last DenseBlock", 10, 2, 2);
+        }
+        if (i == dense_net.size() - 4) {
+            printTensor4D(output, "After last DenseBlock", 10, 2, 2);
+        }
+        if (i == dense_net.size() - 3) {
+            printTensor4D(output, "After Global Pool (before Linear)", 10, 1, 1);
+        }
+        if (i == dense_net.size() - 2) {
+            printTensor4D(output, "After Linear (logits before softmax)", 10, 1, 1);
+        }
+    }
+
+    printTensor4D(output, "Final output of densenet", 1000, 5, 5);
+
+
+
+
+
     
 
     /*for (int b = 0; b < tensor.dimension(0); b++) {

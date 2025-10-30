@@ -4,22 +4,23 @@
 #include "Layers.h"
 
 class ActivationFunction : public Layer {
-    private:
-        std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func;
-        std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func;
-    public:
-        explicit ActivationFunction(std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func,
-                                std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func = nullptr);
+private:
+    std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func;
+    std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func;
+public:
+    explicit ActivationFunction(std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func,
+                            std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func = nullptr);
 
-        Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
+    Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
 
-        void backward(const MatrixXf& grad) {};
-        void update(float learning_rate) {};
+    Eigen::Tensor<float, 4> backward(const MatrixXf& grad) {};
+    void update(float learning_rate) {};
 };
 
 namespace Activation {
     Tensor<float, 4> relu(const Tensor<float, 4> &input);
     Tensor<float, 4> relu_grad(const Tensor<float, 4> &grad, const Tensor<float, 4> &output);
+    Tensor<float, 4> softmax(const Tensor<float, 4> &input);
 }
 
 #endif

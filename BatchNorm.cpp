@@ -9,34 +9,46 @@ BatchNorm::BatchNorm(int in_channels) {
 }
 
 Tensor<float, 4> BatchNorm::forward(const Tensor<float, 4> &input) {
-    int batches = input.dimension(0);
-    int channels = input.dimension(1);
-    int cols = input.dimension(2);
-    int rows = input.dimension(3);
+    int B = input.dimension(0);
+    int C = input.dimension(1);
+    int H = input.dimension(2);
+    int W = input.dimension(3);
+    int spatial_size = B * H * W;
 
-    float num_elements = batches * cols * rows;
+    if (H == 1 && W == 1) {
+        return input;
+    }
 
-    Eigen::array<ptrdiff_t, 3> dimensions({0, 2, 3});
-    Eigen::array<ptrdiff_t, 4> bcast({batches, 1, cols, rows});
-    Eigen::array<ptrdiff_t, 4> resize = {1, channels, 1, 1};
+    Tensor<float, 4> output(B, C, H, W);
 
-    Tensor<float, 1> mean = input.mean(dimensions);
+    for (int c = 0; c < C; ++c) {
+        // Compute mean and variance for this channel
+        float mean = 0.0f;
+        float var = 0.0f;
 
-    auto broadcasted_mean = mean.reshape(resize).broadcast(bcast);
+        for (int b = 0; b < B; ++b)
+            for (int i = 0; i < H; ++i)
+                for (int j = 0; j < W; ++j)
+                    mean += input(b, c, i, j);
+        mean /= spatial_size;
 
-    auto center = (input - broadcasted_mean);
+        for (int b = 0; b < B; ++b)
+            for (int i = 0; i < H; ++i)
+                for (int j = 0; j < W; ++j) {
+                    float diff = input(b, c, i, j) - mean;
+                    var += diff * diff;
+                }
+        var /= spatial_size;
+        float inv_std = 1.0f / std::sqrt(var + epsilon);
 
-    auto squared_diff = center.square();
+        // Normalize + affine transform
+        for (int b = 0; b < B; ++b)
+            for (int i = 0; i < H; ++i)
+                for (int j = 0; j < W; ++j) {
+                    float norm = (input(b, c, i, j) - mean) * inv_std;
+                    output(b, c, i, j) = norm * weights(c) + biases(c);
+                }
 
-    auto variance_sum = squared_diff.sum(dimensions);
-
-    auto variance = variance_sum/num_elements;
-
-    auto broadcasted_var = variance.reshape(resize).broadcast(bcast);
-
-    auto stddev = (broadcasted_var + epsilon).sqrt();
-
-    Tensor<float, 4> normalized = center / stddev;
-
-    return normalized * weights.reshape(resize).broadcast(bcast) + biases.reshape(resize).broadcast(bcast);
+    }
+    return output;
 }

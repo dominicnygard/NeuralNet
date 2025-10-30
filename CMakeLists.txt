@@ -11,6 +11,7 @@ set(SOURCES
     DenseLayerComposite.cpp
     ConvLayer.cpp
     DenseBlock.cpp
+    LinearLayer.cpp
     Pooling.cpp
 )
 
