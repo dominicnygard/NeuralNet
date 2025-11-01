@@ -624,7 +624,7 @@ int main() {
     
     std::vector<std::unique_ptr<Layer>> dense_net;
     dense_net.push_back(make_unique<ConvLayer>(3, 64, 7, 2, 1));
-    dense_net.push_back(make_unique<BatchNorm>(64));
+    /*dense_net.push_back(make_unique<BatchNorm>(64));
     dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
     dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::MAX, 3, 2));
     dense_net.push_back(make_unique<DenseBlock>(64, 32, 6));
@@ -642,50 +642,91 @@ int main() {
     dense_net.push_back(make_unique<BatchNorm>(512));
     dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
     dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 2, 2));
-    dense_net.push_back(make_unique<DenseBlock>(512, 32, 16));
+    dense_net.push_back(make_unique<DenseBlock>(512, 32, 16));*/
     dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 7, 1, PoolingLayer::GLOBAL));
-    dense_net.push_back(make_unique<LinearLayer>(1024, 10));
+    dense_net.push_back(make_unique<LinearLayer>(64, 10));
     dense_net.push_back(make_unique<ActivationFunction>(Activation::softmax));
 
+
     Tensor<float, 4> output;
-    output = tensor;
-    for (size_t i = 0; i < dense_net.size(); ++i) {
-        output = dense_net[i]->forward(output);
-        // Print intermediate outputs to debug
-        if (i == 0) {
-            printTensor4D(output, "After first Conv7x7", 5, 3, 3);
+
+    for (int j = 0; j<32; j++) {
+        // Reset output to input tensor at the start of each iteration
+        output = tensor;
+
+        for (size_t i = 0; i < dense_net.size(); ++i) {
+            output = dense_net[i]->forward(output);
+            // Print intermediate outputs to debug
+            /*if (i == 0) {
+                printTensor4D(output, "After first Conv7x7", 5, 3, 3);
+            }
+            if (i == 4) {
+                printTensor4D(output, "After first DenseBlock", 10, 2, 2);
+            }
+            if (i == 12) {
+                printTensor4D(output, "After second DenseBlock", 10, 2, 2);
+            }
+            if (i == 15) {
+                printTensor4D(output, "After third DenseBlock before", 10, 2, 2);
+            }
+            if (i == 16) {
+                printTensor4D(output, "After third DenseBlock", 10, 2, 2);
+            }
+            if (i == dense_net.size() - 6) {
+                printTensor4D(output, "After ReLU before last DenseBlock", 10, 2, 2);
+            }
+            if (i == dense_net.size() - 5) {
+                printTensor4D(output, "Before last DenseBlock", 10, 2, 2);
+            }
+            if (i == dense_net.size() - 4) {
+                printTensor4D(output, "After last DenseBlock", 10, 2, 2);
+            }
+            if (i == dense_net.size() - 3) {
+                printTensor4D(output, "After Global Pool (before Linear)", 10, 1, 1);
+            }
+            if (i == dense_net.size() - 2) {
+                printTensor4D(output, "After Linear (logits before softmax)", 10, 1, 1);
+            }*/
         }
-        if (i == 4) {
-            printTensor4D(output, "After first DenseBlock", 10, 2, 2);
+    
+        printTensor4D(output, "Final output of densenet", 1000, 5, 5);
+    
+        // Create target one-hot with same shape as final softmax output [B=1, C=10, 1, 1]
+        Tensor<float, 4> testResults(1, 10, 1, 1);
+        testResults.setZero();
+        int correctClass = 3; // hypothetical correct class index
+        testResults(0, correctClass, 0, 0) = 1.0f;
+    
+        // Cross-entropy loss: -sum(target * log(pred))
+        const float eps = 1e-6f;
+        float loss = 0.0f;
+        for (int c = 0; c < 10; ++c) {
+            float p = output(0, c, 0, 0);
+            float t = testResults(0, c, 0, 0);
+            if (t > 0.0f) {
+                loss -= std::log(std::max(p, eps));
+            }
         }
-        if (i == 12) {
-            printTensor4D(output, "After second DenseBlock", 10, 2, 2);
+        std::cout << "Cross-entropy loss (one-sample): " << loss << "\n";
+    
+        // Gradient at logits for softmax + cross-entropy: grad = p - t
+        Tensor<float, 4> grad(1, 10, 1, 1);
+        for (int c = 0; c < 10; ++c) {
+            grad(0, c, 0, 0) = output(0, c, 0, 0) - testResults(0, c, 0, 0);
         }
-        if (i == 15) {
-            printTensor4D(output, "After third DenseBlock before", 10, 2, 2);
+    
+        // Set a learning rate for parameter updates during backward
+        Layer::learning_rate = 0.001f;
+    
+        // Manual backward pass through softmax (identity), linear and pooling
+        for (int i = static_cast<int>(dense_net.size()) - 1; i >= 0; --i) {
+            grad = dense_net[i]->backward(grad);
         }
-        if (i == 16) {
-            printTensor4D(output, "After third DenseBlock", 10, 2, 2);
-        }
-        if (i == dense_net.size() - 6) {
-            printTensor4D(output, "After ReLU before last DenseBlock", 10, 2, 2);
-        }
-        if (i == dense_net.size() - 5) {
-            printTensor4D(output, "Before last DenseBlock", 10, 2, 2);
-        }
-        if (i == dense_net.size() - 4) {
-            printTensor4D(output, "After last DenseBlock", 10, 2, 2);
-        }
-        if (i == dense_net.size() - 3) {
-            printTensor4D(output, "After Global Pool (before Linear)", 10, 1, 1);
-        }
-        if (i == dense_net.size() - 2) {
-            printTensor4D(output, "After Linear (logits before softmax)", 10, 1, 1);
-        }
+    
+        // Optionally, print gradient w.r.t. input to inspect backprop result
+        //printTensor4D(grad, "Grad wrt input (after pooling backward)", 3, 3, 3);
+        std::cout << grad << std::endl;
     }
-
-    printTensor4D(output, "Final output of densenet", 1000, 5, 5);
-
 
 
 

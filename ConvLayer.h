@@ -7,8 +7,8 @@ class ConvLayer : public Layer {
 private:
     Tensor<float, 1> bias;
     Tensor<float, 4> weights;
-    MatrixXd dW;
-    MatrixXd db;
+    Tensor<float, 4> dW;
+    Tensor<float, 1> db;
     int kernel_size;
     int num_filters;
     int stride;
@@ -19,8 +19,7 @@ public:
 
     Tensor<float, 4> forward(const Tensor<float, 4>& input) override;
 
-    Eigen::Tensor<float, 4> backward(const MatrixXf& grad) override {}
-    void update(float learning_rate) override {}
+    Eigen::Tensor<float, 4> backward(const Eigen::Tensor<float, 4>& dY) override;
 };
 
 #endif

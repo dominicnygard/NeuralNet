@@ -9,8 +9,7 @@ public:
     DenseLayerComposite(int growth_rate, int in_channels);
 
     Tensor<float, 4> forward(const Tensor<float, 4> &input);
-    Eigen::Tensor<float, 4> backward(const MatrixXf& grad) override {}
-    void update(float learning_rate) override {}
+    Eigen::Tensor<float, 4> backward(const Eigen::Tensor<float, 4>& dY) override { return dY; }
 };
 
 #endif

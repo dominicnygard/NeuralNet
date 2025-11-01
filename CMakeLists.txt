@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED)
 
 set(SOURCES
     main.cpp
+    Layers.cpp
     Activation.cpp
     BatchNorm.cpp
     DenseLayerComposite.cpp

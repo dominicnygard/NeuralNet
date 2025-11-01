@@ -13,8 +13,7 @@ public:
 
     Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
 
-    Eigen::Tensor<float, 4> backward(const MatrixXf& grad) override {}
-    void update(float learnign_rate) override {}
+    Eigen::Tensor<float, 4> backward(const Eigen::Tensor<float, 4>& dY) override { return dY; }
 };
 
 #endif

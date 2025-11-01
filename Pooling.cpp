@@ -8,6 +8,7 @@ PoolingLayer::PoolingLayer(PoolingType type, int pool_size, int stride, Mode mod
 }
 
 Tensor<float, 4> PoolingLayer::forward(const Tensor<float, 4> &input) {
+    this->input = input;
     int batch_size = input.dimension(0);
     int channels = input.dimension(1);
     int height = input.dimension(2);
@@ -73,4 +74,37 @@ Tensor<float, 4> PoolingLayer::forward(const Tensor<float, 4> &input) {
         }
         return output;
     }
+}
+
+/*
+For global average pooling:
+Y[b,c,0,0] = mean(X[b,c,:,:])
+dX[b,c,h,w] = dY[b,c,0,0] / (H*W)
+*/
+
+Eigen::Tensor<float, 4> PoolingLayer::backward(const Eigen::Tensor<float, 4> &dY)
+{
+    int batch_size = input.dimension(0);
+    int channels = input.dimension(1);
+    int height = input.dimension(2);
+    int width = input.dimension(3);
+
+    Tensor<float, 4> dX(batch_size, channels, height, width);
+    dX.setZero();
+
+    float scale = 1.0f / (height * width);
+
+    if (mode == GLOBAL) {
+        for (int b = 0; b < batch_size; b++) {
+            for (int c = 0; c < channels; c++) {
+                float dY_val = dY(b, c, 0, 0) * scale;
+                for (int h = 0; h < height; h++) {
+                    for (int w = 0; w < width; w++) {
+                        dX(b, c, h, w) = dY_val;
+                    }
+                }
+            }
+        }
+    }
+    return dX;
 }

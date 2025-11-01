@@ -9,10 +9,9 @@ public:
 
     PoolingLayer(PoolingType type, int pool_size, int stride, Mode mode = REGULAR); 
 
-    Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
+    Tensor<float, 4> forward(const Tensor<float, 4>& input) override;
 
-    Eigen::Tensor<float, 4> backward(const MatrixXf& grad) override {}
-    void update(float learnign_rate) override {}
+    Eigen::Tensor<float, 4> backward(const Eigen::Tensor<float, 4>& dY) override;
 private:
     PoolingType type;
     int pool_size;
