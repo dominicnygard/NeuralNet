@@ -9,7 +9,7 @@ public:
     DenseLayerComposite(int growth_rate, int in_channels);
 
     Tensor<float, 4> forward(const Tensor<float, 4> &input);
-    Eigen::Tensor<float, 4> backward(const Eigen::Tensor<float, 4>& dY) override { return dY; }
+    Eigen::Tensor<float, 4> backward(const Eigen::Tensor<float, 4>& dY) override;
 };
 
 #endif

@@ -76,7 +76,11 @@ Eigen::Tensor<float, 4> ConvLayer::backward(const Eigen::Tensor<float, 4> &dY)
 
     int output_size = (input_height + 2 * padding - kernel_size) / stride + 1;
 
-     Tensor<float, 4> dX(batch_size, in_channels, input_height, input_width);
+    Tensor<float, 4> dX(batch_size, in_channels, input_height, input_width);
+
+    dX.setZero();
+    dW.setZero();
+    db.setZero();
 
     for (int b = 0; b < batch_size; b++) {
         for (int oc = 0; oc < num_filters; oc++) {
@@ -95,6 +99,7 @@ Eigen::Tensor<float, 4> ConvLayer::backward(const Eigen::Tensor<float, 4> &dY)
                 padding_amount[1] = std::make_pair(padding, padding);
 
                 Tensor<float, 2>padded_image = image.pad(padding_amount);
+
 
                 Eigen::array<ptrdiff_t, 2> con_dims({0, 1});
                 Tensor<float, 2> convolved_image = padded_image.convolve(dY_kernel, con_dims);
@@ -137,8 +142,7 @@ Eigen::Tensor<float, 4> ConvLayer::backward(const Eigen::Tensor<float, 4> &dY)
                 } else {
                     output_dX = convolved_dX;
                 }
-                
-
+            
 
                 dX.chip(b, 0).chip(ic, 0) += output_dX;
                 dW.chip(oc, 0).chip(ic, 0) += output_image;
@@ -146,8 +150,14 @@ Eigen::Tensor<float, 4> ConvLayer::backward(const Eigen::Tensor<float, 4> &dY)
         }
     }
 
+    float batch_scale = 1.0f / batch_size;
+    dW = dW * batch_scale;
+    db = db * batch_scale;
+
+    //std::cout << "Conv weights sum before=" << weights.sum() << std::endl;
     weights = weights - dW * Layer::learning_rate;
     bias = bias - db * Layer::learning_rate;
+    //std::cout << "Conv weights sum after=" << weights.sum() << std::endl;
 
     return dX;
 }

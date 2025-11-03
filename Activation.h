@@ -9,11 +9,11 @@ private:
     std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func;
 public:
     explicit ActivationFunction(std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func,
-                            std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func = nullptr);
+                            std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func = {});
 
     Tensor<float, 4> forward(const Tensor<float, 4> &input) override;
 
-    Eigen::Tensor<float, 4> backward(const Eigen::Tensor<float, 4>& dY) override { return dY; }
+    Eigen::Tensor<float, 4> backward(const Eigen::Tensor<float, 4>& dY) override;
 };
 
 namespace Activation {

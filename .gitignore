@@ -6,3 +6,4 @@ mnist
 test.py
 valgrind-out.txt
 build
+build_asan

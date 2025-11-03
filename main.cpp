@@ -8,6 +8,10 @@
 #include <iomanip>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <unsupported/Eigen/AutoDiff>
+#include <chrono>
+#include <filesystem>
+#include <cerrno>
+#include <cstring>
 #include "Layers.h"
 #include "ConvLayer.h"
 #include "BatchNorm.h"
@@ -242,7 +246,7 @@ void train_model(NeuralNetwork& model, const std::vector<std::pair<MatrixXf, Mat
             epoch_loss += batch_loss;          
 
             MatrixXf grad = 2 * (predictions - batch_targets) / predictions.rows();
-            model.backward(grad);
+                model.backward(grad);
             model.update(learning_rate);
         }
 
@@ -261,7 +265,7 @@ void train_model(NeuralNetwork& model, const std::vector<std::pair<MatrixXf, Mat
         std::cout << "Epoch " << epoch << " Loss: " << epoch_loss / num_batches << endl;
     }
 }
-
+*/
 class Cifar10data {
     private:
         std::vector<std::string> filenames;
@@ -304,18 +308,18 @@ class Cifar10data {
             return dataset;
         }
 };
-*/
+
 class MnistData {
     private:
         std::string images;
         std::string labels;
         std::vector<std::pair<MatrixXf, MatrixXf>> dataset;
     public:
-        MnistData(std::string &images, std::string &labels) {
-            this->images = images;
-            this->labels = labels;
-            read_dataset();
-        }
+            MnistData(const std::string &images, const std::string &labels) {
+                this->images = images;
+                this->labels = labels;
+                read_dataset();
+            }
 
         int read_int(std::ifstream& file) {
             unsigned char buffer[4];
@@ -327,7 +331,13 @@ class MnistData {
             std::ifstream image_file(images, std::ios::binary);
             std::ifstream label_file(labels, std::ios::binary);
             if (!image_file.is_open() || !label_file.is_open()) {
-                std::cerr << "Could not open file: " << images << std::endl;
+                std::filesystem::path p_images = std::filesystem::absolute(images);
+                std::filesystem::path p_labels = std::filesystem::absolute(labels);
+                std::cerr << "Could not open MNIST files.\n"
+                          << "  images: " << p_images << " exists=" << std::filesystem::exists(p_images) << "\n"
+                          << "  labels: " << p_labels << " exists=" << std::filesystem::exists(p_labels) << "\n"
+                          << "  cwd: " << std::filesystem::current_path() << "\n"
+                          << "  std::strerror(errno): " << std::strerror(errno) << "\n";
                 return;
             }
 
@@ -416,7 +426,51 @@ void printTensor4D(const Tensor<float, 4>& tensor, const std::string& name = "Te
     std::cout << "====================================\n\n";
 }
 
-int main() {
+// Convert dataset (MatrixXf pairs) into vectors of 4D tensors (NCHW)
+void convert_dataset_to_tensors(const std::vector<std::pair<MatrixXf, MatrixXf>>& dataset,
+                                const std::string& kind,
+                                std::vector<Tensor<float,4>>& inputs,
+                                std::vector<Tensor<float,4>>& targets) {
+    inputs.clear(); targets.clear();
+    inputs.reserve(dataset.size()); targets.reserve(dataset.size());
+
+    if (kind == "mnist") {
+        const int H = 28, W = 28, C = 1;
+        for (const auto &p : dataset) {
+            const MatrixXf &img = p.first; // 1 x (H*W)
+            Tensor<float,4> t(1, C, H, W);
+            for (int i = 0; i < H; ++i)
+                for (int j = 0; j < W; ++j)
+                    t(0,0,i,j) = img(0, i*W + j);
+            inputs.push_back(std::move(t));
+
+            Tensor<float,4> lab(1, 10, 1, 1);
+            lab.setZero();
+            int label_col; p.second.row(0).maxCoeff(&label_col);
+            lab(0, label_col, 0, 0) = 1.0f;
+            targets.push_back(std::move(lab));
+        }
+    } else if (kind == "cifar10") {
+        const int H = 32, W = 32, C = 3;
+        for (const auto &p : dataset) {
+            const MatrixXf &img = p.first; // 1 x 3072
+            Tensor<float,4> t(1, C, H, W);
+            for (int c = 0; c < C; ++c)
+                for (int i = 0; i < H; ++i)
+                    for (int j = 0; j < W; ++j)
+                        t(0,c,i,j) = img(0, c*H*W + i*W + j);
+            inputs.push_back(std::move(t));
+
+            Tensor<float,4> lab(1, 10, 1, 1);
+            lab.setZero();
+            int label_col; p.second.row(0).maxCoeff(&label_col);
+            lab(0, label_col, 0, 0) = 1.0f;
+            targets.push_back(std::move(lab));
+        }
+    }
+}
+
+int main(int argc, char** argv) {
     //std::vector<std::string> filenames = {"cifar-10-batches-bin/data_batch_1.bin"};
     //std::vector<std::string> test_filenames = {"cifar-10-batches-bin/test_batch.bin"}; 
     //"cifar-10-batches-bin/data_batch_2.bin", "cifar-10-batches-bin/data_batch_3.bin", 
@@ -468,7 +522,7 @@ int main() {
 
     std::cout << "Accuracy: " << accuracy << std::endl;
     */
-    int batch_size = 1;
+    int temp_batch_size = 1;
     int in_channels = 3;
     int height = 230;
     int width = 230;
@@ -488,7 +542,7 @@ int main() {
     int output_height = height - kernel_size + 1;  // 5 - 3 + 1 = 3
     int output_width = width - kernel_size + 1;
     
-    Tensor<float, 4> tensor(1, 3, 32, 32);
+    Tensor<float, 4> tensor(32, 3, 32, 32);
     tensor.setRandom();
     /*tensor.setValues({{{
         {  1024,   2,   3,   4,   50,   6,   7,   8,   9,  1000,  110,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32},
@@ -621,17 +675,56 @@ int main() {
      //Tensor<float, 4> testInput(1, 3, 224, 224);
      //testInput.setRandom();  // Random values in [-1, 1]
      //testInput = (testInput + 1.0f) * 0.5f;  // Scale to [0, 1]
+
+
+    /*
+    auto spatial_dims = Eigen::array<int, 3>({0, 2, 3});  // mean over batch, height, width
+    Tensor<float, 1> tensorMean = tensor.mean(spatial_dims);
+    std::cout << "mean before batch" << tensorMean;
+
+    printTensor4D(tensor, "tensor before batch norm", 3, 5, 5);
+    BatchNorm batchLayer(3);
+    Tensor<float, 4> summable(tensor.dimension(0), tensor.dimension(1), tensor.dimension(2), tensor.dimension(3));
+    float sum = 0.f;
+    Eigen::array<int, 3>dims{0, 2, 3};
+    Eigen::array<ptrdiff_t, 4> bcast({tensor.dimension(0), 1, tensor.dimension(2), tensor.dimension(3)});
+    Eigen::array<ptrdiff_t, 4> resize({1, tensor.dimension(1), 1, 1});
+
+    Tensor<float, 1> testGamma(tensor.dimension(1));
+    testGamma.setValues({1.0f, 2.0f, 3.0f});
+    // Time the BatchNorm forward pass (small test area)
+    auto t0 = std::chrono::steady_clock::now();
+    /*for (int b = 0; b < tensor.dimension(0); b++) {
+        for (int c = 0; c < tensor.dimension(1); c++) {
+            for (int h = 0; h < tensor.dimension(2); h++) {
+                for (int w = 0; w < tensor.dimension(3); w++) {
+                    summable(b, c, h, w) = tensor(b, c, h, w) * testGamma(c);
+                }
+            }
+        }
+    }*/
+    
+    //Tensor<float, 4> batchTest = batchLayer.forward(tensor);
+    //auto t1 = std::chrono::steady_clock::now();
+    //auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+    //auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    //std::cout << "BatchNorm forward time: " << elapsed_us << " us (" << elapsed_ms << " ms)" << std::endl;
+    
+    //printTensor4D(batchTest, "batch test", 3, 5, 5);
+
+    //Tensor<float, 1> mean = batchTest.mean(spatial_dims);
+    //std::cout << "mean after batch" << mean;
     
     std::vector<std::unique_ptr<Layer>> dense_net;
-    dense_net.push_back(make_unique<ConvLayer>(3, 64, 7, 2, 1));
-    /*dense_net.push_back(make_unique<BatchNorm>(64));
+    dense_net.push_back(make_unique<BatchNorm>(3));
     dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
+    dense_net.push_back(make_unique<ConvLayer>(3, 64, 7, 2, 1));
     dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::MAX, 3, 2));
     dense_net.push_back(make_unique<DenseBlock>(64, 32, 6));
     dense_net.push_back(make_unique<ConvLayer>(256, int(256*0.5), 1, 1, 0));
     dense_net.push_back(make_unique<BatchNorm>(128));
     dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
-    dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 2, 2));
+    dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::MAX, 2, 2));
     dense_net.push_back(make_unique<DenseBlock>(128, 32, 12));
     dense_net.push_back(make_unique<ConvLayer>(512, int(512*0.5), 1, 1, 0));
     dense_net.push_back(make_unique<BatchNorm>(256));
@@ -642,22 +735,22 @@ int main() {
     dense_net.push_back(make_unique<BatchNorm>(512));
     dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
     dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 2, 2));
-    dense_net.push_back(make_unique<DenseBlock>(512, 32, 16));*/
+    dense_net.push_back(make_unique<DenseBlock>(512, 32, 16));
     dense_net.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 7, 1, PoolingLayer::GLOBAL));
-    dense_net.push_back(make_unique<LinearLayer>(64, 10));
+    dense_net.push_back(make_unique<LinearLayer>(1024, 10));
     dense_net.push_back(make_unique<ActivationFunction>(Activation::softmax));
 
 
     Tensor<float, 4> output;
 
-    for (int j = 0; j<32; j++) {
+    for (int j = 0; j<100; j++) {
         // Reset output to input tensor at the start of each iteration
         output = tensor;
 
         for (size_t i = 0; i < dense_net.size(); ++i) {
             output = dense_net[i]->forward(output);
             // Print intermediate outputs to debug
-            /*if (i == 0) {
+            if (i == 0) {
                 printTensor4D(output, "After first Conv7x7", 5, 3, 3);
             }
             if (i == 4) {
@@ -686,37 +779,43 @@ int main() {
             }
             if (i == dense_net.size() - 2) {
                 printTensor4D(output, "After Linear (logits before softmax)", 10, 1, 1);
-            }*/
+            }
         }
     
         printTensor4D(output, "Final output of densenet", 1000, 5, 5);
     
-        // Create target one-hot with same shape as final softmax output [B=1, C=10, 1, 1]
-        Tensor<float, 4> testResults(1, 10, 1, 1);
+        // Create target one-hot with same batch size as final softmax output
+        int B_out = output.dimension(0);
+        Tensor<float, 4> testResults(B_out, 10, 1, 1);
         testResults.setZero();
-        int correctClass = 3; // hypothetical correct class index
-        testResults(0, correctClass, 0, 0) = 1.0f;
-    
-        // Cross-entropy loss: -sum(target * log(pred))
+        int correctClass = 3; // hypothetical correct class index for sample 0
+        if (B_out > 0) testResults(0, correctClass, 0, 0) = 1.0f;
+
+        // Cross-entropy loss: average over batch
         const float eps = 1e-6f;
         float loss = 0.0f;
-        for (int c = 0; c < 10; ++c) {
-            float p = output(0, c, 0, 0);
-            float t = testResults(0, c, 0, 0);
-            if (t > 0.0f) {
-                loss -= std::log(std::max(p, eps));
+        for (int b = 0; b < B_out; ++b) {
+            for (int c = 0; c < 10; ++c) {
+                float p = output(b, c, 0, 0);
+                float t = testResults(b, c, 0, 0);
+                if (t > 0.0f) {
+                    loss -= std::log(std::max(p, eps));
+                }
             }
         }
-        std::cout << "Cross-entropy loss (one-sample): " << loss << "\n";
-    
-        // Gradient at logits for softmax + cross-entropy: grad = p - t
-        Tensor<float, 4> grad(1, 10, 1, 1);
-        for (int c = 0; c < 10; ++c) {
-            grad(0, c, 0, 0) = output(0, c, 0, 0) - testResults(0, c, 0, 0);
+        if (B_out > 0) loss /= static_cast<float>(B_out);
+        std::cout << "Cross-entropy loss (batch): " << loss << "\n";
+
+        // Gradient at logits for softmax + cross-entropy: grad = p - t (per sample)
+        Tensor<float, 4> grad(B_out, 10, 1, 1);
+        for (int b = 0; b < B_out; ++b) {
+            for (int c = 0; c < 10; ++c) {
+                grad(b, c, 0, 0) = output(b, c, 0, 0) - testResults(b, c, 0, 0);
+            }
         }
     
         // Set a learning rate for parameter updates during backward
-        Layer::learning_rate = 0.001f;
+        Layer::learning_rate = 0.1f;
     
         // Manual backward pass through softmax (identity), linear and pooling
         for (int i = static_cast<int>(dense_net.size()) - 1; i >= 0; --i) {
@@ -724,11 +823,12 @@ int main() {
         }
     
         // Optionally, print gradient w.r.t. input to inspect backprop result
-        //printTensor4D(grad, "Grad wrt input (after pooling backward)", 3, 3, 3);
-        std::cout << grad << std::endl;
+        printTensor4D(grad, "Grad wrt input (after pooling backward)", 3, 7, 7);
+        //std::cout << grad << std::endl;
     }
 
 
+    
 
 
     
@@ -746,54 +846,6 @@ int main() {
         std::cout << std::endl;
     }*/
 
-    Tensor<float, 4> test(2, 3, 2, 2);
-    test.setValues(
-    {{{{3, 3},
-    {3, 3}},
-    {{2, 2},
-    {2, 2}},
-    {
-        {1, 2},
-        {3, 4}
-    }},
-    {
-        {{3, 3},
-    {3, 3}},
-    {{2, 2},
-    {2, 2}},
-    {
-        {2, 2},
-        {3, 4}
-    }
-    }});
-
-    Tensor<float, 4> test2(2, 3, 2, 2);
-    test2.setValues(
-    {{{{3, 3},
-    {3, 3}},
-    {{2, 2},
-    {2, 2}},
-    {
-        {1, 2},
-        {3, 4}
-    }},
-    {
-        {{3, 3},
-    {3, 3}},
-    {{2, 2},
-    {2, 2}},
-    {
-        {2, 2},
-        {3, 4}
-    }
-    }});
-
-    Tensor<float, 4> newt_test(1, 1, 4, 4);
-    newt_test.setValues({{{{1, 2, 3, 4},
-                            {5, 6, 7, 8},
-                            {9, 10, 11, 12},
-                            {13, 14, 15, 16}
-                            }}});
 
     
     //PoolingLayer pool(PoolingLayer::AVERAGE, 2, 2);
@@ -805,16 +857,168 @@ int main() {
 
     //std::cout << poolTEst << std::endl;
 
-    /*Tensor<float, 2> chipped = test.chip(0, 0).chip(0, 0);
-    Tensor<float, 4> out(1, 1, 1, 1);
-    out.setZero();
-    Tensor<float, 0> max_val = chipped.maximum();
-    float new_max = max_val(0);
-    out(0, 0, 0, 0) = new_max;
+    // --- small training entry (use existing loaders and helper above) ---
+    // parse simple args
+    /*
+    std::string train_flag = "";
+    int n_samples = 100;
+    int epochs = 3;
+    int batch_size = 1;
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "--train" && i + 1 < argc) train_flag = argv[++i];
+        else if (a == "--n" && i + 1 < argc) n_samples = std::stoi(argv[++i]);
+        else if (a == "--epochs" && i + 1 < argc) epochs = std::stoi(argv[++i]);
+        else if (a == "--batch" && i + 1 < argc) batch_size = std::stoi(argv[++i]);
+    }
 
-    std::cout << out << std::endl;
+    if (!train_flag.empty()) {
+        std::cout << "Preparing small training run: " << train_flag << " n=" << n_samples << " epochs=" << epochs << " batch=" << batch_size << "\n";
+        
+        std::vector<std::pair<MatrixXf, MatrixXf>> dataset;
+        if (train_flag == "mnist") {
+            std::string img = "mnist/train-images.idx3-ubyte";
+            std::string lbl = "mnist/train-labels.idx1-ubyte";
+            MnistData loader(img, lbl);
+            dataset = loader.get_dataset();
+        } else if (train_flag == "cifar10") {
+            std::vector<std::string> files = {"cifar-10-batches-bin/data_batch_1.bin"};
+            Cifar10data loader(files);
+            dataset = loader.get_dataset();
+        } else {
+            std::cerr << "Unknown dataset: " << train_flag << "\n";
+            return 1;
+        }
 
-    return 0;*/
+        if (n_samples < (int)dataset.size()) dataset.resize(n_samples);
+
+        std::vector<Tensor<float,4>> inputs, targets;
+        convert_dataset_to_tensors(dataset, train_flag, inputs, targets);
+
+            std::cout << "Loaded dataset size: " << dataset.size() << " -> inputs=" << inputs.size() << " targets=" << targets.size() << "\n";
+            if (!inputs.empty()) {
+                // print basic stats for first input
+                const auto &t0 = inputs[0];
+                float s = 0.0f; float mn = t0(0,0,0,0), mx = mn;
+                for (int c = 0; c < t0.dimension(1); ++c)
+                    for (int i = 0; i < t0.dimension(2); ++i)
+                        for (int j = 0; j < t0.dimension(3); ++j) {
+                            float v = t0(0,c,i,j);
+                            s += v;
+                            mn = std::min(mn, v);
+                            mx = std::max(mx, v);
+                        }
+                std::cout << "first input stats sum=" << s << " min=" << mn << " max=" << mx << "\n";
+            }
+
+            
+
+    // build a small, stable model for quick tests (MNIST/CIFAR small subset)
+    // Architecture: Conv(3x3, same) -> BatchNorm -> ReLU -> GlobalAvgPool -> Linear -> Softmax
+    std::vector<std::unique_ptr<Layer>> model;
+    int in_ch = (train_flag == "mnist") ? 1 : 3;
+    // small conv: 16 filters, 3x3 kernel, stride 1, padding 1 keeps spatial dims
+    model.push_back(make_unique<ConvLayer>(in_ch, 64, 7, 2, 1));
+    model.push_back(make_unique<BatchNorm>(64));
+    model.push_back(make_unique<ActivationFunction>(Activation::relu));
+    model.push_back(make_unique<PoolingLayer>(PoolingLayer::MAX, 3, 2));
+    model.push_back(make_unique<DenseBlock>(64, 32, 6));
+    model.push_back(make_unique<ConvLayer>(256, int(256*0.5), 1, 1, 0));
+    model.push_back(make_unique<BatchNorm>(128));
+    model.push_back(make_unique<ActivationFunction>(Activation::relu));
+    model.push_back(make_unique<PoolingLayer>(PoolingLayer::MAX, 2, 2));
+    model.push_back(make_unique<DenseBlock>(128, 32, 12));
+    model.push_back(make_unique<ConvLayer>(512, int(512*0.5), 1, 1, 0));
+    model.push_back(make_unique<BatchNorm>(256));
+    model.push_back(make_unique<ActivationFunction>(Activation::relu));
+    model.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 2, 2));
+    model.push_back(make_unique<DenseBlock>(256, 32, 24));
+    model.push_back(make_unique<ConvLayer>(1024, int(1024*0.5), 1, 1, 0));
+    model.push_back(make_unique<BatchNorm>(512));
+    model.push_back(make_unique<ActivationFunction>(Activation::relu));
+    model.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 2, 2));
+    model.push_back(make_unique<DenseBlock>(512, 32, 16));
+    model.push_back(make_unique<PoolingLayer>(PoolingLayer::AVERAGE, 7, 1, PoolingLayer::GLOBAL));
+    model.push_back(make_unique<LinearLayer>(1024, 10));
+    model.push_back(make_unique<ActivationFunction>(Activation::softmax));
+
+
+    // reasonable learning rate for this tiny model
+    Layer::learning_rate = 0.01f;
+
+        // training loop (simple SGD, per-sample or small batches)
+        std::mt19937 rng(std::random_device{}());
+        std::vector<int> idx(inputs.size()); std::iota(idx.begin(), idx.end(), 0);
+
+        for (int e = 0; e < epochs; ++e) {
+            std::shuffle(idx.begin(), idx.end(), rng);
+            double epoch_loss = 0.0;
+            for (size_t ii = 0; ii < idx.size(); ii += batch_size) {
+                int bs = std::min(batch_size, (int)(idx.size() - ii));
+                // process each sample individually (you can vectorize later)
+                for (int b = 0; b < bs; ++b) {
+                    int id = idx[ii + b];
+                    Tensor<float,4> x = inputs[id];
+                    Tensor<float,4> out = x;
+                    for (size_t li = 0; li < model.size(); ++li) out = model[li]->forward(out);
+                    // loss
+                    //std::cout << "Logits: ";
+                    //std::cout << out << "\n";
+                    //std::cout << "\n";
+                    int correct = -1;
+                    float bestv = -1.0f;
+                    for (int c = 0; c < out.dimension(1); ++c) {
+                        float v = targets[id](0, c, 0, 0);
+                        if (v > bestv) { bestv = v; correct = c; }
+                    }
+                    if (correct < 0) correct = 0;
+                    float p = out(0, correct, 0, 0);
+                    float sample_loss = -std::log(std::max(p, 1e-7f));
+                    epoch_loss += sample_loss;
+                    // debug: print first few sample probabilities in each epoch
+                    if (ii == 0 && b < 5) {
+                        std::cout << " debug epoch " << e << " sample " << b << " correct=" << correct << " bestv=" << bestv
+                                  << " out_dim=" << out.dimension(1) << " p=" << p << " loss=" << sample_loss << "\n";
+                        std::cout << "  target vector: ";
+                        for (int cc = 0; cc < out.dimension(1); ++cc) std::cout << targets[id](0,cc,0,0) << " ";
+                        std::cout << "\n";
+                    }
+                    // grad
+                    Tensor<float,4> grad = out;
+                    for (int c = 0; c < 10; ++c) grad(0,c,0,0) = out(0,c,0,0) - targets[id](0,c,0,0);
+                        for (int li = (int)model.size() - 1; li >= 0; --li) {
+                            grad = model[li]->backward(grad);
+                            // check for NaNs in grad
+                            bool found_nan = false;
+                            for (int b2 = 0; b2 < grad.dimension(0) && !found_nan; ++b2)
+                                for (int c2 = 0; c2 < grad.dimension(1) && !found_nan; ++c2)
+                                    for (int h2 = 0; h2 < grad.dimension(2) && !found_nan; ++h2)
+                                        for (int w2 = 0; w2 < grad.dimension(3) && !found_nan; ++w2)
+                                            if (std::isnan(grad(b2,c2,h2,w2))) { found_nan = true; break; }
+                            if (found_nan) {
+                                std::cerr << "NaN encountered in gradient after backward of layer " << li
+                                          << " type=" << typeid(*model[li]).name() << "\n";
+                                // dump a little info and abort this run
+                                std::abort();
+                            }
+                        }
+                }
+            }
+            std::cout << "Epoch " << e << " loss=" << (epoch_loss / inputs.size()) << "\n";
+
+            // print model output for first sample to see if it changes
+            if (!inputs.empty()) {
+                Tensor<float,4> out0 = inputs[0];
+                for (size_t li = 0; li < model.size(); ++li) out0 = model[li]->forward(out0);
+                std::cout << " first_sample_output: ";
+                for (int c = 0; c < out0.dimension(1); ++c) std::cout << out0(0,c,0,0) << " ";
+                std::cout << "\n";
+            }
+        }
+        std::cout << "Done training small set." << std::endl;
+    }*/
+    
+    return 0;
 }
 
 

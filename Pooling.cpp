@@ -105,6 +105,62 @@ Eigen::Tensor<float, 4> PoolingLayer::backward(const Eigen::Tensor<float, 4> &dY
                 }
             }
         }
+    } else {
+        int output_height = (height - pool_size) / stride + 1;
+        int output_width = (width - pool_size) / stride + 1;
+        for (int b = 0; b < batch_size; b++) {
+            for (int c = 0; c < channels; c++ ) {
+                Tensor<float, 2> feature_map = dX.chip(b, 0).chip(c, 0);
+
+                for (int i = 0; i < output_height; i++) {
+                    for (int j = 0; j < output_width; j++) {
+                        int start_row = i * stride;
+                        int start_col = j * stride;
+
+                        int end_row = std::min(start_row + pool_size, height);
+                        int end_col = std::min(start_col + pool_size, width);
+
+                        Eigen::array<int, 2>offsets({start_row, start_col});
+                        Eigen::array<int, 2>extents({end_row - start_row, end_col - start_col});
+
+                        int window_h = end_row - start_row;
+                        int window_w = end_col - start_col;
+                        if (window_h <= 0 || window_w <= 0) continue; // nothing to do
+
+                        if (type == MAX) {
+                            // initialize to first element in window to avoid invalid indices
+                            int max_r = start_row;
+                            int max_s = start_col;
+                            float max_val = input(b, c, max_r, max_s);
+
+                            for (int r = 0; r < window_h; ++r) {
+                                for (int s = 0; s < window_w; ++s) {
+                                    int rr = start_row + r;
+                                    int ss = start_col + s;
+                                    float val = input(b, c, rr, ss);
+                                    if (val > max_val) {
+                                        max_val = val;
+                                        max_r = rr;
+                                        max_s = ss;
+                                    }
+                                }
+                            }
+
+                            dX(max_r < 0 || max_s < 0 ? 0 : b, c, max_r, max_s) += dY(b, c, i, j);
+                        } else {
+                            float per = dY(b,c,i,j) / float(window_h * window_w);
+                            for (int r = 0; r < window_h; ++r)
+                                for (int s = 0; s < window_w; ++s) {
+                                    int rr = start_row + r;
+                                    int ss = start_col + s;
+                                    dX(b, c, rr, ss) += per;
+                                }
+                        }
+
+                    }
+                }
+            }
+        }
     }
     return dX;
 }

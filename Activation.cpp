@@ -1,4 +1,5 @@
 #include "Activation.h"
+#include <iostream>
 
 ActivationFunction::ActivationFunction(std::function<Tensor<float, 4>(const Tensor<float, 4>&)> activation_func,
         std::function<Tensor<float, 4>(const Tensor<float, 4>&, const Tensor<float, 4>&)> grad_func) {
@@ -12,14 +13,27 @@ Tensor<float, 4> ActivationFunction::forward(const Tensor<float, 4> &input) {
     return output;
 }
 
+Eigen::Tensor<float, 4> ActivationFunction::backward(const Eigen::Tensor<float, 4> &dY)
+{
+    if (!grad_func) {
+        return dY;
+    }
+
+    output = grad_func(dY, input);
+    return output;
+}
+
 namespace Activation {
     Tensor<float, 4> relu(const Tensor<float, 4> &input) {
         return input.cwiseMax(0.0f);
     }
 
-    Tensor<float, 4> relu_grad(const Tensor<float, 4> &grad, const Tensor<float, 4> &output) {
-        (void)grad;
-        return output;
+    Tensor<float, 4> relu_grad(const Tensor<float, 4> &dY, const Tensor<float, 4> &x) {
+        // Avoid using Tensor::select with a scalar else-value (which can
+        // instantiate TensorSelectOp with a non-tensor ElseDerived and
+        // trigger deep Eigen template errors). Use an element-wise mask
+        // multiplication instead: dY * (x > 0).cast<float>().
+        return dY * ( (x > 0.0f).cast<float>() );
     }
 
     Tensor<float, 4> softmax(const Tensor<float, 4> &input) {
@@ -27,6 +41,8 @@ namespace Activation {
         const int C = input.dimension(1);
         const int H = input.dimension(2);
         const int W = input.dimension(3);
+
+        //std::cout << input << "\n";
 
         Eigen::array<ptrdiff_t, 1> reduceC = {1};
         Eigen::array<ptrdiff_t, 4> reshapeDims = {B, 1, H, W};
