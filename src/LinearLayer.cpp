@@ -6,7 +6,6 @@ LinearLayer::LinearLayer(int in_features, int out_features) {
     dW = Tensor<float, 2>(out_features, in_features);
     db = Tensor<float, 1>(out_features);
 
-    // Xavier/Glorot initialization for better convergence
     float limit = std::sqrt(6.0f / (in_features + out_features));
     weights.setRandom();
     weights = weights * limit;

@@ -7,3 +7,6 @@ test.py
 valgrind-out.txt
 build
 build_asan
+build_coverage
+build_release
+build_test

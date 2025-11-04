@@ -714,7 +714,7 @@ int main(int argc, char** argv) {
 
     //Tensor<float, 1> mean = batchTest.mean(spatial_dims);
     //std::cout << "mean after batch" << mean;
-    
+    /*
     std::vector<std::unique_ptr<Layer>> dense_net;
     dense_net.push_back(make_unique<BatchNorm>(3));
     dense_net.push_back(make_unique<ActivationFunction>(Activation::relu));
@@ -825,7 +825,7 @@ int main(int argc, char** argv) {
         // Optionally, print gradient w.r.t. input to inspect backprop result
         printTensor4D(grad, "Grad wrt input (after pooling backward)", 3, 7, 7);
         //std::cout << grad << std::endl;
-    }
+    }*/
 
 
     
@@ -859,7 +859,7 @@ int main(int argc, char** argv) {
 
     // --- small training entry (use existing loaders and helper above) ---
     // parse simple args
-    /*
+    
     std::string train_flag = "";
     int n_samples = 100;
     int epochs = 3;
@@ -944,7 +944,7 @@ int main(int argc, char** argv) {
 
 
     // reasonable learning rate for this tiny model
-    Layer::learning_rate = 0.01f;
+    Layer::learning_rate = 0.1f;
 
         // training loop (simple SGD, per-sample or small batches)
         std::mt19937 rng(std::random_device{}());
@@ -976,13 +976,13 @@ int main(int argc, char** argv) {
                     float sample_loss = -std::log(std::max(p, 1e-7f));
                     epoch_loss += sample_loss;
                     // debug: print first few sample probabilities in each epoch
-                    if (ii == 0 && b < 5) {
-                        std::cout << " debug epoch " << e << " sample " << b << " correct=" << correct << " bestv=" << bestv
-                                  << " out_dim=" << out.dimension(1) << " p=" << p << " loss=" << sample_loss << "\n";
-                        std::cout << "  target vector: ";
-                        for (int cc = 0; cc < out.dimension(1); ++cc) std::cout << targets[id](0,cc,0,0) << " ";
-                        std::cout << "\n";
-                    }
+
+                    std::cout << " debug epoch " << e << " sample " << b << " correct=" << correct << " bestv=" << bestv
+                                << " out_dim=" << out.dimension(1) << " p=" << p << " loss=" << sample_loss << "\n";
+                    std::cout << "  target vector: ";
+                    for (int cc = 0; cc < out.dimension(1); ++cc) std::cout << targets[id](0,cc,0,0) << " ";
+                    std::cout << "\n";
+                    
                     // grad
                     Tensor<float,4> grad = out;
                     for (int c = 0; c < 10; ++c) grad(0,c,0,0) = out(0,c,0,0) - targets[id](0,c,0,0);
@@ -1016,11 +1016,27 @@ int main(int argc, char** argv) {
             }
         }
         std::cout << "Done training small set." << std::endl;
-    }*/
+    }
     
     return 0;
 }
 
 
-//TODO
-//Make dense block creation more modular, instead of being static
+//2.30259
+//2.31201
+//2.23396
+//2.17344
+//2.12826
+//2.08933
+//2.06554
+//2.0454
+//2.03368
+//2.02248
+//2.20732
+//2.01298
+//2.00791
+//2.00115
+//1.99185
+//2.17109
+//2.16435
+//2.15776
