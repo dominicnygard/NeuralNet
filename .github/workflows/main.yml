@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: |
+          sudo apt-get updates
+          sudo apt-get install -y cmake g++ gcovr
+      - name: Configure build coverage
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
+            -DENABLE_COVERAGE=ON
+      - name: Build
+        run: cmake --build build -j$(nproc)
+      - name: Run tests
+        run: |
+          cd build
+          ctest --output-on-failure
+      - name: Generate coverage report
+        run: |
+          gcovr -r .. --exclude '.*_deps.*' --exclude \
+          '.*/build_coverage/.*' --xml -o coverage.xml
+      - name: Upload report to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+
+        
+
