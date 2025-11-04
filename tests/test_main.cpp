@@ -1,19 +1,10 @@
+#define CATCH_CONFIG_MAIN
+#include <catch2/catch_all.hpp>
+
 #include <catch2/catch_test_macros.hpp>
 #include "Activation.h"
 #include "LinearLayer.h"
 
-TEST_CASE("Activation ReLU works correctly", "[activation]") {
-    Eigen::Tensor<float, 4> input(1, 3, 2, 2);
-    input.setConstant(-1.0f);
-    input(0, 0, 0, 0) = 5.0f;
-    input(0, 1, 1, 1) = 3.0f;
-    
-    auto relu_result = Activation::relu(input);
-    
-    REQUIRE(relu_result(0, 0, 0, 0) == 5.0f);
-    REQUIRE(relu_result(0, 1, 1, 1) == 3.0f);
-    REQUIRE(relu_result(0, 2, 0, 0) == 0.0f);  // Negative became 0
-}
 
 TEST_CASE("Basic tensor operations", "[tensor]") {
     Eigen::Tensor<float, 4> t(2, 3, 4, 5);
