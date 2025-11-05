@@ -314,6 +314,7 @@ int main(int argc, char** argv) {
     // --- small training entry (use existing loaders and helper above) ---
     // parse simple args
     
+    /*
     std::string train_flag = "";
     int n_samples = 100;
     int epochs = 3;
@@ -471,6 +472,56 @@ int main(int argc, char** argv) {
         }
         std::cout << "Done training small set." << std::endl;
     }
-    
+    */
+
+
+    int batches = 2;
+    int in_channels = 3;
+    int out_channels = 8;
+    int in_h = 10;
+    int in_w = 10;
+    int kernel_h = 3;
+    int kernel_w = 3;
+
+    const int total = out_channels * in_channels * kernel_h * kernel_w;
+    Tensor<float, 4> weights(out_channels, in_channels, kernel_h, kernel_w);
+    int idx = 0;
+    for (int o = 0; o < out_channels; o++) {
+        for (int c = 0; c <in_channels; c++) {
+            for (int kh = 0; kh < kernel_h; kh++) {
+                for (int kw = 0; kw < kernel_w; kw++) {
+                    float v = (idx / float(total - 1)) - 0.5f; // in [-0.5, 0.5]
+                    weights(o, c, kh, kw) = v;
+                    idx++;
+                }
+            }
+        }
+    }
+
+
+    Tensor<float, 4> input(batches, in_channels, in_h, in_w);
+    for (int n = batches; n < 2; ++n) {
+        for (int h = 0; h < in_h; ++h) {
+            for (int w = 0; w < in_w; ++w) {
+                input(n, 0, h, w) = 5.0f;
+                input(n, 1, h, w) = static_cast<float>(n * 4 + h * 2 + w);
+                input(n, 2, h, w) = 1.0f;
+            }
+        }
+    }
+
+    Tensor<float, 1> bias(8);
+    bias.setValues({0.4f, 0.2f, 0.5f, 0.5f, 0.2f, 0.9f, 0.7f, 0.5f});
+
+    auto convolution = ConvLayer(3, 8, 3);
+    convolution.setBias(bias);
+    convolution.setWeights(weights);
+    printTensor4D(convolution.getWeights());
+
+    Tensor<float, 4> output = convolution.forward(input);
+
+    printTensor4D(output, "convolution forward output", 8, 10, 10);
+
+
     return 0;
 }

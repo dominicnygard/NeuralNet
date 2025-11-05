@@ -155,8 +155,8 @@ Eigen::Tensor<float, 4> ConvLayer::backward(const Eigen::Tensor<float, 4> &dY)
     db = db * batch_scale;
 
     //std::cout << "Conv weights sum before=" << weights.sum() << std::endl;
-    weights = weights - dW * Layer::learning_rate;
-    bias = bias - db * Layer::learning_rate;
+    weights -= dW * Layer::learning_rate;
+    bias -= db * Layer::learning_rate;
     //std::cout << "Conv weights sum after=" << weights.sum() << std::endl;
 
     return dX;
