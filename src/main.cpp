@@ -314,7 +314,7 @@ int main(int argc, char** argv) {
     // --- small training entry (use existing loaders and helper above) ---
     // parse simple args
     
-    /*
+    
     std::string train_flag = "";
     int n_samples = 100;
     int epochs = 3;
@@ -472,9 +472,9 @@ int main(int argc, char** argv) {
         }
         std::cout << "Done training small set." << std::endl;
     }
-    */
+    
 
-
+    /*
     int batches = 2;
     int in_channels = 3;
     int out_channels = 8;
@@ -500,7 +500,8 @@ int main(int argc, char** argv) {
 
 
     Tensor<float, 4> input(batches, in_channels, in_h, in_w);
-    for (int n = batches; n < 2; ++n) {
+    input.setZero();
+    for (int n = 0; n < batches; ++n) {
         for (int h = 0; h < in_h; ++h) {
             for (int w = 0; w < in_w; ++w) {
                 input(n, 0, h, w) = 5.0f;
@@ -516,12 +517,12 @@ int main(int argc, char** argv) {
     auto convolution = ConvLayer(3, 8, 3);
     convolution.setBias(bias);
     convolution.setWeights(weights);
-    printTensor4D(convolution.getWeights());
+    printTensor4D(input, "Input tensor", 3, 5, 5);
 
     Tensor<float, 4> output = convolution.forward(input);
 
     printTensor4D(output, "convolution forward output", 8, 10, 10);
 
-
+    */
     return 0;
 }
